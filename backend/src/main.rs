@@ -4,6 +4,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use tower_http::cors::{CorsLayer, Any};
 
 #[derive(Serialize, Deserialize)]
 struct Message {
@@ -12,12 +13,17 @@ struct Message {
 
 #[tokio::main]
 async fn main() {
-    // Build our application with a route
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .expose_headers(Any);
+
     let app = Router::new()
         .route("/", get(root))
-        .route("/api/echo", post(echo));
+        .route("/api/echo", post(echo))
+        .layer(cors);
 
-    // Run the app
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Listening on http://{}", addr);
     axum::Server::bind(&addr)
@@ -26,12 +32,10 @@ async fn main() {
         .unwrap();
 }
 
-// Simple GET route to test server
 async fn root() -> &'static str {
     "Hello from the Rust server!"
 }
 
-// Simple POST route to echo back a message
 async fn echo(Json(message): Json<Message>) -> Json<Message> {
     Json(Message {
         content: format!("Server received: {}", message.content),

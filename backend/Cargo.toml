@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 axum = "0.6"
-tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tower = "0.4"
-tower-http = { version = "0.6", features = ["cors"] }
-
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.3", features = ["cors"] }
+openai-api-rs = "6.0.6"
