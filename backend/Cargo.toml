@@ -11,3 +11,4 @@ tower = "0.4"
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.3", features = ["cors"] }
 openai-api-rs = "6.0.6"
+dotenv = "0.15.0"

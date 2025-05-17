@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const url = "http://localhost:3000/api/echo";
+const url = "http://localhost:3000/api/response";
 
 function ChatApp() {
   const [messages, setMessages] = useState<{sender: 'user' | 'system', content: string}[]>([]);
