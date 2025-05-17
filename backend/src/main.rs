@@ -76,10 +76,11 @@ async fn response(Json(message): Json<Message>) -> Json<Message> {
     // Send the request and await the response
     let result = client.chat_completion(req).await.unwrap();
 
-    let response_content = &result.choices[0].message.content;
-
-    let response_content = format!("{:?}", response_content);
-
+    let response_content = match &result.choices[0].message.content {
+        Some(content) => content.to_string(),
+        None => "No content returned".to_string(),
+    };
+    
     // Return the response as Json
     Json(Message {
         content: response_content
