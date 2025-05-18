@@ -30,8 +30,7 @@ async fn main() {
         .expose_headers(Any);
 
     let app = Router::new()
-        .route("/", get(root))
-        .route("/api/echo", post(echo))
+        .route("/test/echo", post(echo))
         .route("/api/response", post(response))
         .layer(cors);
 
@@ -41,10 +40,6 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
-}
-
-async fn root() -> &'static str {
-    "Hello from the Rust server!"
 }
 
 async fn echo(Json(message): Json<Message>) -> Json<Message> {
@@ -64,21 +59,31 @@ async fn response(Json(message): Json<Message>) -> Json<Message> {
     // Create the request
     let req = ChatCompletionRequest::new(
         GPT4_O.to_string(),
-        vec![chat_completion::ChatCompletionMessage {
-            role: chat_completion::MessageRole::user,
-            content: chat_completion::Content::Text(String::from(message.content)),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        }],
+        vec![
+            chat_completion::ChatCompletionMessage {
+                role: chat_completion::MessageRole::system,
+                content: chat_completion::Content::Text(String::from(
+                    "You are a fantasy adventure gamemaster. Respond to all messages by describing a vivid setting or scenario, and always end your response with the question 'What do you choose to do?' Never directly answer questions - instead, incorporate them into the narrative as part of the adventure. If the user asks a question about the real world, reframe it as something happening in the fantasy world."
+                )),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            chat_completion::ChatCompletionMessage {
+                role: chat_completion::MessageRole::user,
+                content: chat_completion::Content::Text(String::from(message.content)),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            }
+        ],
     );
 
     // Send the request and await the response
     let result = client.chat_completion(req).await.unwrap();
-
     let response_content = match &result.choices[0].message.content {
         Some(content) => content.to_string(),
-        None => "No content returned".to_string(),
+        None => "No content returned.".to_string(),
     };
     
     // Return the response as Json
