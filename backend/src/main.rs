@@ -1,13 +1,18 @@
 use axum::{
     routing::{get, post},
-    Json, Router,
+    extract::{State, Json},
+    Router,
 };
 
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{CorsLayer, Any};
 
-use std::net::SocketAddr;
-use std::env;
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    env,
+};
+
 use dotenv::dotenv;
 
 use openai_api_rs::v1::{
@@ -21,8 +26,40 @@ struct Message {
     content: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Config {
+    player_name: String,
+    theme: String,
+}
+
+#[derive(Clone)]
+struct AppState {
+    config: Arc<Mutex<Config>>
+}
+
+// === Start: Basic test functions ===
+async fn echo(Json(message): Json<Message>) -> Json<Message> {
+    Json(Message {
+        content: format!("Server received: {}", message.content),
+    })
+}
+
+async fn greet() -> Json<Message> {
+    Json(Message {
+        content: "Hello, tester!".to_string()
+    })
+}
+// === End ===
+
 #[tokio::main]
 async fn main() {
+    let app_state = AppState {
+        config: Arc::new(Mutex::new(Config {
+            player_name: String::from(""),
+            theme: String::from(""),
+        })),
+    };
+
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -30,8 +67,11 @@ async fn main() {
         .expose_headers(Any);
 
     let app = Router::new()
+        .route("/test/greet", get(greet))
         .route("/test/echo", post(echo))
         .route("/api/response", post(response))
+        .route("/api/initialize", post(initialize))
+        .with_state(app_state)
         .layer(cors);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -42,29 +82,32 @@ async fn main() {
         .unwrap();
 }
 
-async fn echo(Json(message): Json<Message>) -> Json<Message> {
-    Json(Message {
-        content: format!("Server received: {}", message.content),
-    })
+async fn initialize(
+    State(state): State<AppState>,
+    Json(new_config): Json<Config>,
+) -> String {
+    let mut config = state.config.lock().unwrap();
+    *config = new_config;
+
+    String::from("Config successfully updated!")
 }
 
 async fn response(Json(message): Json<Message>) -> Json<Message> {
     dotenv().ok();
-    // Get API key from environment
+    
     let api_key = env::var("OPENAI_API_KEY").unwrap();
     
-    // Build the OpenAI client
     let mut client = OpenAIClient::builder().with_api_key(api_key).build().unwrap();
 
-    // Create the request
     let req = ChatCompletionRequest::new(
         GPT4_O.to_string(),
         vec![
             chat_completion::ChatCompletionMessage {
                 role: chat_completion::MessageRole::system,
-                content: chat_completion::Content::Text(String::from(
-                    "You are a fantasy adventure gamemaster. Respond to all messages by describing a vivid setting or scenario, and always end your response with the question 'What do you choose to do?' Never directly answer questions - instead, incorporate them into the narrative as part of the adventure. If the user asks a question about the real world, reframe it as something happening in the fantasy world."
-                )),
+                content: chat_completion::Content::Text(
+                    String::from("You are an adventure gamemaster. Please respond to requests with descriptive but (generally) short responses. Always end your response with the question 'What do you choose to do?' Do not answer questions that are irrelevant to the established game world. If the user asks a question about the real world, inform the user that you can not respond to the request."
+                    )
+                ),
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
@@ -79,14 +122,12 @@ async fn response(Json(message): Json<Message>) -> Json<Message> {
         ],
     );
 
-    // Send the request and await the response
     let result = client.chat_completion(req).await.unwrap();
     let response_content = match &result.choices[0].message.content {
         Some(content) => content.to_string(),
         None => "No content returned.".to_string(),
     };
     
-    // Return the response as Json
     Json(Message {
         content: response_content
     })
