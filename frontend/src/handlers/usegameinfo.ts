@@ -17,7 +17,7 @@ const useGameInfo = () => {
     );
   }, [gameInfo]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: any) => {
     const { name, value } = e.target;
     setGameInfo(prev => ({
       ...prev,

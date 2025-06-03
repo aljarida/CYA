@@ -1,4 +1,4 @@
-const postJsonRequest = async (url, body) => {
+const postJsonRequest = async (url: string, body: object) => {
   try {
     const response = await fetch(url, {
       method: "POST",

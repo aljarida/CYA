@@ -27,9 +27,12 @@ struct Message {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Config {
     player_name: String,
-    theme: String,
+    world_theme: String,
+    player_description: String,
+    world_description: String,
 }
 
 #[derive(Clone)]
@@ -56,7 +59,9 @@ async fn main() {
     let app_state = AppState {
         config: Arc::new(Mutex::new(Config {
             player_name: String::from(""),
-            theme: String::from(""),
+            world_theme: String::from(""),
+            player_description: String::from(""),
+            world_description: String::from(""),
         })),
     };
 
@@ -85,28 +90,36 @@ async fn main() {
 async fn initialize(
     State(state): State<AppState>,
     Json(new_config): Json<Config>,
-) -> String {
+) -> Json<Message> {
     let mut config = state.config.lock().unwrap();
     *config = new_config;
 
-    String::from("Config successfully updated!")
+    Json(Message {
+        content: String::from("Config successfully updated!")
+    })
 }
 
-async fn response(Json(message): Json<Message>) -> Json<Message> {
+async fn response(
+    State(state): State<AppState>,
+    Json(message): Json<Message>
+) -> Json<Message> {
     dotenv().ok();
     
     let api_key = env::var("OPENAI_API_KEY").unwrap();
     
     let mut client = OpenAIClient::builder().with_api_key(api_key).build().unwrap();
 
+    let config = state.config.lock().unwrap();
+    let name = &config.player_name;
+
+    // Temporary holding: "You are an adventure gamemaster. Please respond to requests with descriptive but (generally) short responses. Always end your response with the question 'What do you choose to do?' Do not answer questions that are irrelevant to the established game world. If the user asks a question about the real world, inform the user that you can not respond to the request."
     let req = ChatCompletionRequest::new(
         GPT4_O.to_string(),
         vec![
             chat_completion::ChatCompletionMessage {
                 role: chat_completion::MessageRole::system,
                 content: chat_completion::Content::Text(
-                    String::from("You are an adventure gamemaster. Please respond to requests with descriptive but (generally) short responses. Always end your response with the question 'What do you choose to do?' Do not answer questions that are irrelevant to the established game world. If the user asks a question about the real world, inform the user that you can not respond to the request."
-                    )
+                    String::from(format!("Greet them by their name {}", name))
                 ),
                 name: None,
                 tool_calls: None,
