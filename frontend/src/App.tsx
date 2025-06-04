@@ -25,19 +25,17 @@ function ChatApp() {
     setFormSubmitted(true);
     
     setTimeout(async () => {
-      // TODO: Submit a post request to modify the game state with the game info.
       setShowModal(false);
-      console.log("Handling form submission");
 
       try {
         const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
-        console.log("Received result", result)
+        console.log("Initialization succeeded")
+		console.log(result)
       } catch (error) {
         console.log(error)
       }
 
-      console.log(gameInfo);
-      addMessage({ sender: 'system', content: "Handled form submission. Check console." });
+      addMessage({ sender: 'system', content: `Welcome to your adventure, ${gameInfo.playerName}! Simply start typing to get started!`});
     }, FORM_SUBMIT_DELAY);
   };
 

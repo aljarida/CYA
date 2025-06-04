@@ -1,0 +1,6 @@
+API endpoints:
+- localhost:3000/api/initialize
+- localhost:3000/api/response
+
+Initialize takes a JSON object "gameInfo" and initializes the game state with it.
+Response takes a JSON message container user input.
