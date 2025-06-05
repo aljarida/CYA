@@ -27,28 +27,18 @@ function SetupForm({
           label="Game Theme"
           value={gameInfo.worldTheme}
           onChange={handleInputChange}
-          placeholder="Fantasy, Sci-fi, Horror, etc."
+          placeholder="Detail the game world"
           required
         />
         
         <FormField
           id="playerDescription"
           name="playerDescription"
-          label="Description of Player Character (optional)"
+          label="Description of Player Character"
           value={gameInfo.playerDescription}
           onChange={handleInputChange}
           placeholder="Describe your character"
-          isTextarea
-        />
-        
-        <FormField
-          id="worldDescription"
-          name="worldDescription"
-          label="Description of World (optional)"
-          value={gameInfo.worldDescription}
-          onChange={handleInputChange}
-          placeholder="Describe the game world"
-          isTextarea
+		  required
         />
         
         <button

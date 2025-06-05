@@ -17,7 +17,6 @@ state = {
     "playerName": None,
     "playerDescription": None,
     "worldTheme": None,
-    "worldDescription": None,
     "gamePrompt": None,
     "chatHistory": []
 }
@@ -28,8 +27,6 @@ SYSTEM_PROMPT_TEMPLATE = """
     The game setting is the following:
 
     World Theme: {worldTheme}
-    World Description: {worldDescription}
-
     Player: {playerName}
     Player Description: {playerDescription}
 
@@ -41,11 +38,11 @@ SYSTEM_PROMPT_TEMPLATE = """
 
 def paint_player():
     prompt = f"""
-            Portrait of a person, head and shoulders only, facing forward, in the style of a character selection screen from a medieval strategy game. 
+            Portrait of a person, head and shoulders only, facing forward.
             The person is described as: "{state['playerDescription']}". 
-            The world background is: "{state['worldDescription']}". 
-            No text, no full body, no logos, no weapons, no fantastical elements unless specified. 
-            Neutral lighting, realistic proportions, painted illustration style, symmetrical framing.
+            The world is described as: "{state['worldTheme']}". 
+            No text, no full body, no logos, no fantastical elements unless specified. 
+            Realistic proportions, painted in oil-painting style, symmetrical framing.
         """.strip()
 
     result = client.images.generate(
@@ -60,7 +57,6 @@ def paint_player():
 def setup_game_prompt():
     system_message = SYSTEM_PROMPT_TEMPLATE.format(
         worldTheme=state["worldTheme"],
-        worldDescription=state["worldDescription"],
         playerName=state["playerName"],
         playerDescription=state["playerDescription"]
     )
@@ -129,7 +125,7 @@ def is_relevant(user_message):
 @app.route('/api/initialize', methods=['POST'])
 def initialize():
     data = request.get_json()
-    required_fields = ["playerName", "playerDescription", "worldTheme", "worldDescription"]
+    required_fields = ["playerName", "playerDescription", "worldTheme"]
     
     for field in required_fields:
         if field not in data:

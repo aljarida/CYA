@@ -5,7 +5,6 @@ const useGameInfo = () => {
     playerName: "",
     worldTheme: "",
     playerDescription: "",
-    worldDescription: ""
   });
 
   const [isFormValid, setIsFormValid] = useState(false);
@@ -13,7 +12,8 @@ const useGameInfo = () => {
   useEffect(() => {
     setIsFormValid(
       gameInfo.playerName.trim() !== "" && 
-      gameInfo.worldTheme.trim() !== ""
+      gameInfo.worldTheme.trim() !== "" &&
+	  gameInfo.playerDescription.trim() !== ""
     );
   }, [gameInfo]);
 

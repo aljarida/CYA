@@ -13,7 +13,7 @@ function ChatInput({ input, setInput, onSend, onKeyPress }: ChatInputProps) {
         />
         <button 
         onClick={onSend} 
-        className="ml-2 px-4 py-2 bg-neutral-800/80 text-neutral-200 rounded-lg backdrop-blur-sm shadow-lg hover:bg-neutral-700 transition-colors"
+        className="ml-2 px-4 py-2 bg-neutral-800/80 text-neutral-200 rounded-lg backdrop-blur-sm shadow-lg hover:outline-none hover:ring-2 hover:ring-neutral-500 transition-colors"
         >
         Send
         </button>
