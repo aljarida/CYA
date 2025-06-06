@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
+import { Heart, HeartCrack } from 'lucide-react';
+
 import { API_INITIALIZE_URL } from './misc/enums';
 
 import useGameInfo from './handlers/usegameinfo';
@@ -15,6 +17,7 @@ function ChatApp() {
   const [showModal, setShowModal] = useState(true);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
+  const [hitPoints, setHitPoints] = useState<number>(-1);
 
   const { gameInfo, isFormValid, handleInputChange } = useGameInfo();
   const { messages, input, setInput, sendMessage, handleKeyPress, addMessage } = useChat();
@@ -26,20 +29,40 @@ function ChatApp() {
 
     try {
       const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
-      console.log("Initialization succeeded");
-      console.log(result);
 
       setPortraitUrl(result.portraitUrl);
       setShowModal(false);
+	  setHitPoints(5); // TODO: Should not be magic.
 
       addMessage({
         sender: 'system',
         content: `Welcome to your adventure, ${gameInfo.playerName}! Simply start typing to get started!`,
       });
     } catch (error) {
-      console.log(error);
+      addMessage({
+        sender: 'error',
+        content: error,
+      });
     }
   };
+
+  // TODO: Similar to the TODO below; fix the architecture.
+  const handleSendMessage = async() => {
+	  console.log("handleSendMessage called!")
+	  const result = await sendMessage();
+	  console.log(result)
+
+	  if (result.hasOwnProperty('hitPoints') && typeof result.hitPoints == 'number') {
+		  setHitPoints(result.hitPoints);
+	  }
+  }
+
+  // TODO: Instead of shadowing handleKeyPress, fix the architecture.
+  const handleKeyPress_ = async(e: any) => {
+	if (e.key === 'Enter') {
+		handleSendMessage();
+	}
+  }
 
   return (
     <div className="relative flex flex-col h-screen bg-gradient-to-br from-neutral-800 via-gray-700 to-neutral-600 p-8 pr-16">
@@ -62,13 +85,28 @@ function ChatApp() {
 	  </div>
 	)}
 
+	{hitPoints >= 0 && (
+  <div className="absolute top-26 right-8 flex gap-1 w-20 justify-end">
+    {Array.from({ length: 5 }).map((_, i) =>
+      i < 5 - hitPoints ? (
+        // Broken heart (lost health)
+        <HeartCrack key={i} className="w-4 h-4 z-3 text-red-400" />
+      ) : (
+        // Full heart
+        <Heart key={i} className="w-4 h-4 z-3 text-red-400 fill-current stroke-none" />
+      )
+    )}
+  </div>
+)}
+
+
       <ChatMessages messages={messages} />
 
       <ChatInput
         input={input}
         setInput={setInput}
-        onSend={sendMessage}
-        onKeyPress={handleKeyPress}
+        onSend={handleSendMessage}
+        onKeyPress={handleKeyPress_}
       />
     </div>
   );

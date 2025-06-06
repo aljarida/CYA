@@ -13,8 +13,8 @@ const useChat = () => {
     setMessages(prev => [...prev, { sender, content }]);
   };
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (): Promise<object | null> => {
+    if (!input.trim()) return null;
     
     const userMessage = input;
     addMessage({ sender: 'user', content: userMessage });
@@ -25,9 +25,11 @@ const useChat = () => {
         content: userMessage,
       });
       
-      addMessage({ sender: 'system', content: result.content });
+      addMessage({ sender: 'gamemaster', content: result.content });
+	  return result;
     } catch (error) {
-      addMessage({ sender: 'system', content: "Error fetching message" });
+      addMessage({ sender: 'error', content: "Error fetching message" });
+	  return null;
     }
   };
 

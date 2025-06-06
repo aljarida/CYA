@@ -2,9 +2,22 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
 from dotenv import load_dotenv
+from enum import Enum, auto
+import logging
+
 import os
 
 load_dotenv()
+
+class Damage(Enum):
+    ZERO = auto()
+    ONE = auto()
+    DEADLY = auto()
+
+logging.basicConfig(
+    level=logging.DEBUG,  # or INFO
+    format='%(asctime)s [%(levelname)s] %(message)s'
+)
 
 # Load environment variables
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -18,7 +31,8 @@ state = {
     "playerDescription": None,
     "worldTheme": None,
     "gamePrompt": None,
-    "chatHistory": []
+    "chatHistory": [],
+    "HP": -1,
 }
 
 # SYSTEM PROMPT TEMPLATE
@@ -68,6 +82,9 @@ def setup_game_prompt():
     
     state["gamePrompt"] = system_message
 
+def setup_hp():
+    state["HP"] = 5
+
 def get_gamemaster_reply(user_message):
     state["chatHistory"].append({"role": "user", "content": user_message})
     
@@ -82,7 +99,10 @@ def get_gamemaster_reply(user_message):
 
 def is_relevant(user_message):
     prompt = f"""
-        You are an assistant that only answers 'true' or 'false'.
+        You are an assistant that only answers 'true' or 'false'. Your job is to determine whether a message is relevant to the game context.
+
+        An example of an irrelevant user message is one in which the game world is historical and medieval, and player describes modern technology such as a television or modern people such as Donald Trump. In this case, you would reply 'false'.
+
 
         Determine if the following user message is relevant to the current game situation.
 
@@ -98,29 +118,78 @@ def is_relevant(user_message):
         "{user_message}"
 
         ====================
-
-        An example of an irrelevant user message is one in which the game world is historical and medieval, and player describes modern technology such as a gun or modern people such as Donald Trump. In this case, you would return 'false'.
-
-        Is this user message relevant to the game context? Answer only 'true' or 'false'.
+        Is this user message relevant to the game context and story? Answer only 'true' or 'false'.
     """
-
-    response = client.chat.completions.create(
-        model="gpt-4",  # or "gpt-4o"
-        messages=state["chatHistory"]
-    )
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
     )
 
     reply = response.choices[0].message.content
 
+    logging.info("Received the following to is_relevant: %s", reply)
+
     if reply is None:
         return False
 
-    return reply.strip().lower() == 'true'
+    match reply.strip().lower():
+        case 'true' | "'true'" | '"true"':
+            return True
+        case _:
+            return False
+
+def is_damaging() -> Damage:
+    prompt = f"""
+        You are an assistant that only answers with the following three options:
+        'yes'
+        'no'
+        'hugely'
+        
+        Your job is to analyze the game context to determine if the most recent player action and most recent game response describe a scenario in which the player should be damaged or lose all HP.
+
+        For example, if a player wrote, "I attack the bear with all my great might, sure to tear it apart.", you would analyse the player's traits to determine if they could realistically do this. If in your analysis you determine that the player could not, because they are "but a peasant" or a "nerdy doctor", you would return "yes", indicating that the player should incur damage. If the blow were deemed by you to be fatal, you would reply "hugely". If the player were a superhero, you might reply "no".
+
+        Note that things can be hugely even if they do not involve direct conflict. For example, if a player wrote I choose to sit in a wheatfield for the next 3 months, eating nothing, drinking nothing.", you would be correct to reply 'hugely'.
+
+        That all said, please see the important context below for rendering your decision now:
+
+        === Game story prior ===
+        "{state['chatHistory'][1:-2]}"
+        
+        === Recent user message to judge ===
+        "{state['chatHistory'][-2]}"
+
+        === Recent system response to use in judgement ===
+        "{state['chatHistory'][-1]}"
+
+        Is it 'yes', 'no', or 'hugely'?
+    """.strip()
+    
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+
+    reply = response.choices[0].message.content
+   
+
+    logging.info("Received the following to is_damaging: %s", reply)
+    
+    if reply is None:
+        return Damage.ZERO
+
+    match reply.lower().strip():
+        case "yes" | "'yes'" | '"yes"':
+            return Damage.ONE
+        case "hugely" | "'hugely'" | '"hugely"':
+            return Damage.DEADLY
+        case _:
+            return Damage.ZERO
+
+
 
 @app.route('/api/initialize', methods=['POST'])
 def initialize():
@@ -135,6 +204,7 @@ def initialize():
     for field in required_fields:
         state[field] = data[field]
 
+    setup_hp()
     setup_game_prompt()
     portrait_url = paint_player()
     return jsonify({
@@ -154,7 +224,18 @@ def response():
         return jsonify({"error": "User reply is not relevant"}), 400
 
     reply = get_gamemaster_reply(user_message)
-    return jsonify({"content": reply})
+
+    dmg = is_damaging()
+    
+    if dmg == Damage.ONE:
+        state["HP"] -= 1
+
+    assert(state["HP"] >= 0)
+    if dmg == Damage.DEADLY or state["HP"] == 0:
+        state["HP"] = 0
+        return jsonify({"content": "You have died!", "hitPoints": state["HP"]})
+
+    return jsonify({"content": reply, "hitPoints": state["HP"]})
 
 if __name__ == '__main__':
     app.run(debug=True, port=3000)
