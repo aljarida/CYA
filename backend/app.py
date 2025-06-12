@@ -1,242 +1,202 @@
 from flask import Flask, request, jsonify
+from flask.typing import ResponseReturnValue
 from flask_cors import CORS
-from openai import OpenAI
-from dotenv import load_dotenv
-from enum import Enum, auto
-import logging
 
+from openai import OpenAI
+from openai.types import ImagesResponse
+from openai.types.chat import ChatCompletion
+
+from dotenv import load_dotenv
+from typing import Any, Callable
 import os
 
-load_dotenv()
+import prompts
+from classes import State, Sender
 
-class Damage(Enum):
-    ZERO = auto()
-    ONE = auto()
-    DEADLY = auto()
+PLACEHOLDER_PORTRAIT_URL = "https://upload.wikimedia.org/wikipedia/commons/4/4b/Josef_Bergenthal_oil_painting_portrait.jpg"
+PLACEHOLDER_BACKDROP_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/%28Venice%29_Rape_of_Europa_by_Francesco_Zuccarelli_-_Gallerie_Accademia.jpg/1024px-%28Venice%29_Rape_of_Europa_by_Francesco_Zuccarelli_-_Gallerie_Accademia.jpg"
 
-logging.basicConfig(
-    level=logging.DEBUG,  # or INFO
-    format='%(asctime)s [%(levelname)s] %(message)s'
-)
+DEBUG_MODE: bool = True
 
-# Load environment variables
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-app = Flask(__name__)
+app: Flask = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# In-memory game state
-state = {
-    "playerName": None,
-    "playerDescription": None,
-    "worldTheme": None,
-    "gamePrompt": None,
-    "chatHistory": [],
-    "HP": -1,
-}
+load_dotenv()
+client: OpenAI = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# SYSTEM PROMPT TEMPLATE
-SYSTEM_PROMPT_TEMPLATE = """
-    You are a gamemaster for a text-based adventure. 
-    The game setting is the following:
+state: State = State()
 
-    World Theme: {worldTheme}
-    Player: {playerName}
-    Player Description: {playerDescription}
+def empty_str_if_none(reply: str | None) -> str:
+    return reply if reply is not None else ""
 
-    Please keep your responses relatively short on the average, unless something extremely eventful occurs.
-    Please also ensure that your responses respect the four component parts (World Theme/Description, and Player Theme/Description) well.
+def paint_player() -> str:
+    if DEBUG_MODE:
+        return PLACEHOLDER_PORTRAIT_URL
 
-    Take it step by step! You have got this.
-"""
+    prompt: str = prompts.portrait(state)
+    try:
+        result: ImagesResponse = client.images.generate(
+            model="dall-e-2",
+            prompt=prompt,
+            size="512x512",
+            n=1
+        )
 
-def paint_player():
-    prompt = f"""
-            Portrait of a person, head and shoulders only, facing forward.
-            The person is described as: "{state['playerDescription']}". 
-            The world is described as: "{state['worldTheme']}". 
-            No text, no full body, no logos, no fantastical elements unless specified. 
-            Realistic proportions, painted in oil-painting style, symmetrical framing.
-        """.strip()
+        return empty_str_if_none(result.data[0].url)
+    except:
+        return PLACEHOLDER_PORTRAIT_URL
+    
+def paint_world() -> str:
+    if DEBUG_MODE:
+        return PLACEHOLDER_BACKDROP_URL
 
-    result = client.images.generate(
-        model="dall-e-2",
-        prompt=prompt,
-        size="512x512",
-        n=1
+    prompt: str = prompts.backdrop(state)
+    try:
+        result: ImagesResponse = client.images.generate(
+            model="dall-e-2",
+            prompt=prompt,
+            size="1024x1024",
+            n=1
+        )
+
+        return empty_str_if_none(result.data[0].url)
+    except Exception as e:
+        return str(e)
+
+def response_with_sys_user(sys_content: str, user_content: str) -> str:
+    response: ChatCompletion = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[
+            {"role": "system", "content": sys_content},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0,
     )
+    reply: str = empty_str_if_none(response.choices[0].message.content)
+    return reply
 
-    return result.data[0].url
 
-def setup_game_prompt():
-    system_message = SYSTEM_PROMPT_TEMPLATE.format(
-        worldTheme=state["worldTheme"],
-        playerName=state["playerName"],
-        playerDescription=state["playerDescription"]
-    )
+def setup_initialization_prompt() -> None:
+    prompt: str = prompts.initialization(state)
 
-    # Reset chat history with new system prompt
-    state["chatHistory"] = [
-        {"role": "system", "content": system_message}
+    state.chatHistory = [
+        {"role": "system", "content": prompt}
     ]
     
-    state["gamePrompt"] = system_message
+    state.initializationPrompt = prompt
 
-def setup_hp():
-    state["HP"] = 5
-
-def get_gamemaster_reply(user_message):
-    state["chatHistory"].append({"role": "user", "content": user_message})
+def get_gamemaster_reply(user_message) -> str:
+    state.chatHistory.append({"role": "user", "content": user_message})
     
     response = client.chat.completions.create(
-        model="gpt-4",  # or "gpt-4o"
-        messages=state["chatHistory"]
+        model="gpt-4.1",
+        messages=state.chatHistory
     )
     
-    reply = response.choices[0].message.content
-    state["chatHistory"].append({"role": "assistant", "content": reply})
+    reply: str = empty_str_if_none(response.choices[0].message.content)
+    
+    state.chatHistory.append({"role": "assistant", "content": reply})
+
     return reply
 
 def is_relevant(user_message):
-    prompt = f"""
-        You are an assistant that only answers 'true' or 'false'. Your job is to determine whether a message is relevant to the game context.
-
-        An example of an irrelevant user message is one in which the game world is historical and medieval, and player describes modern technology such as a television or modern people such as Donald Trump. In this case, you would reply 'false'.
-
-
-        Determine if the following user message is relevant to the current game situation.
-
-        ====================
-
-        === Game context ===
-        "{state['gamePrompt']}"
-
-        === Game story thus far ===
-        "{state['chatHistory'][1:]}"
-        
-        === User message ===
-        "{user_message}"
-
-        ====================
-        Is this user message relevant to the game context and story? Answer only 'true' or 'false'.
-    """
+    sys, user  = prompts.relevant(state, user_message)
+    reply: str = response_with_sys_user(sys, user)
     
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-    )
-
-    reply = response.choices[0].message.content
-
-    logging.info("Received the following to is_relevant: %s", reply)
-
-    if reply is None:
-        return False
-
     match reply.strip().lower():
         case 'true' | "'true'" | '"true"':
             return True
         case _:
             return False
 
-def is_damaging() -> Damage:
-    prompt = f"""
-        You are an assistant that only answers with the following three options:
-        'yes'
-        'no'
-        'hugely'
-        
-        Your job is to analyze the game context to determine if the most recent player action and most recent game response describe a scenario in which the player should be damaged or lose all HP.
-
-        For example, if a player wrote, "I attack the bear with all my great might, sure to tear it apart.", you would analyse the player's traits to determine if they could realistically do this. If in your analysis you determine that the player could not, because they are "but a peasant" or a "nerdy doctor", you would return "yes", indicating that the player should incur damage. If the blow were deemed by you to be fatal, you would reply "hugely". If the player were a superhero, you might reply "no".
-
-        Note that things can be hugely even if they do not involve direct conflict. For example, if a player wrote I choose to sit in a wheatfield for the next 3 months, eating nothing, drinking nothing.", you would be correct to reply 'hugely'.
-
-        That all said, please see the important context below for rendering your decision now:
-
-        === Game story prior ===
-        "{state['chatHistory'][1:-2]}"
-        
-        === Recent user message to judge ===
-        "{state['chatHistory'][-2]}"
-
-        === Recent system response to use in judgement ===
-        "{state['chatHistory'][-1]}"
-
-        Is it 'yes', 'no', or 'hugely'?
-    """.strip()
+def assess_damage(user_message: str, gamemaster_reply: str) -> int:
+    sys, user = prompts.damaging(state, user_message, gamemaster_reply)
+    reply: str = response_with_sys_user(sys, user)
     
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-    )
+    remove_quotes: Callable[[str], str] = lambda s: s.replace('"', '').replace("'", '')
+    damage: str = remove_quotes(reply).lower().strip()
 
-    reply = response.choices[0].message.content
-   
-
-    logging.info("Received the following to is_damaging: %s", reply)
-    
-    if reply is None:
-        return Damage.ZERO
-
-    match reply.lower().strip():
-        case "yes" | "'yes'" | '"yes"':
-            return Damage.ONE
-        case "hugely" | "'hugely'" | '"hugely"':
-            return Damage.DEADLY
+    match damage:
+        case "5" | "4" | "3" | "2" | "1":
+            return int(damage)
         case _:
-            return Damage.ZERO
+            return 0
 
-
+def game_over_summmary() -> str:
+    sys, user = prompts.game_over_summmary(state)
+    return response_with_sys_user(sys, user)    
 
 @app.route('/api/initialize', methods=['POST'])
-def initialize():
-    data = request.get_json()
-    required_fields = ["playerName", "playerDescription", "worldTheme"]
+def initialize() -> ResponseReturnValue:
+    data: dict[str, Any] = request.get_json()
+    required_fields: list[str] = ["playerName", "playerDescription", "worldTheme"]
     
     for field in required_fields:
         if field not in data:
-            return jsonify({"error": f"Missing field: {field}"}), 400
+            return jsonify({
+                    "sender": str(Sender.ERROR),
+                    "content": f"Missing field: {field}!"
+                }), 400
 
-    # Update state
     for field in required_fields:
-        state[field] = data[field]
+        setattr(state, field, data[field])
 
-    setup_hp()
-    setup_game_prompt()
-    portrait_url = paint_player()
+    setup_initialization_prompt()
+    portrait_url: str = paint_player()
+    world_backdrop_url: str = paint_world()
+
     return jsonify({
-        "status": "initialized",
-        "systemPrompt": state["chatHistory"][0]["content"],
+        "sender": str(Sender.SYSTEM),
+        "systemPrompt": state.initializationPrompt,
         "portraitUrl": portrait_url,
-    })
+        "worldBackdropUrl": world_backdrop_url,
+    }), 200
 
 @app.route('/api/response', methods=['POST'])
-def response():
+def response() -> ResponseReturnValue:
+    if state.hitPoints <= 0:
+        return jsonify({
+                "sender": str(Sender.SYSTEM),
+                "content": "You are dead. Please refresh the browser to play again.",
+            }), 200
+
     data = request.get_json()
     if "content" not in data:
-        return jsonify({"error": "Missing 'content' in request"}), 400
+        return jsonify({
+                "sender": str(Sender.ERROR),
+                "content": "Missing 'content' in request."
+            }), 400
 
     user_message = data["content"]
     if not is_relevant(user_message):
-        return jsonify({"error": "User reply is not relevant"}), 400
+        return jsonify({
+                "sender": str(Sender.ERROR),
+                "content": "Your message is not relevant to the game story."
+            }), 400
 
-    reply = get_gamemaster_reply(user_message)
+    reply: str = get_gamemaster_reply(user_message)
+    if len(reply) == 0:
+        return jsonify({
+                "sender": str(Sender.ERROR),
+                "content": "Gamemaster failed to generate a response."
+            }), 500
 
-    dmg = is_damaging()
-    
-    if dmg == Damage.ONE:
-        state["HP"] -= 1
+    dmg: int = assess_damage(user_message, reply)
+    state.hitPoints -= dmg
 
-    assert(state["HP"] >= 0)
-    if dmg == Damage.DEADLY or state["HP"] == 0:
-        state["HP"] = 0
-        return jsonify({"content": "You have died!", "hitPoints": state["HP"]})
+    if state.hitPoints <= 0:
+        return jsonify({
+                "sender": str(Sender.SYSTEM),
+                "content": "Oh, no! Unfortunately, you have died!",
+                "gameOverSummary": game_over_summmary(),
+                "hitPoints": state.hitPoints,
+            }), 200
 
-    return jsonify({"content": reply, "hitPoints": state["HP"]})
+    return jsonify({
+            "sender": str(Sender.GAMEMASTER),
+            "content": reply,
+            "hitPoints": state.hitPoints
+        }), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=3000)
-

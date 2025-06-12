@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
-import { Heart, HeartCrack } from 'lucide-react';
-
-import { API_INITIALIZE_URL } from './misc/enums';
+import { API_INITIALIZE_URL, MAX_HIT_POINTS } from './misc/enums';
 
 import useGameInfo from './handlers/usegameinfo';
 import useChat from './handlers/usechat';
@@ -12,56 +10,65 @@ import SetupModal from './components/SetupModal';
 import ChatMessages from './components/ChatMessages';
 import ChatInput from './components/ChatInput';
 import postJsonRequest from './misc/postjsonrequest';
+import Portrait from './components/Portrait';
+import HitPoints from './components/HitPoints';
+import WorldBackdrop from './components/WorldBackdrop';
 
 function ChatApp() {
   const [showModal, setShowModal] = useState(true);
   const [formSubmitted, setFormSubmitted] = useState(false);
-  const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
+  const [portraitUrl, setPortraitUrl] = useState<string>("");
+  const [worldBackdropUrl, setWorldBackdropUrl] = useState<string>("");
   const [hitPoints, setHitPoints] = useState<number>(-1);
 
   const { gameInfo, isFormValid, handleInputChange } = useGameInfo();
-  const { messages, input, setInput, sendMessage, handleKeyPress, addMessage } = useChat();
+  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo } = useChat();
 
   const handleFormSubmit = async (_: FormEvent) => {
     if (!isFormValid) return;
 
     setFormSubmitted(true);
 
-    try {
-      const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
+    const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
+    const data = result.data;
 
-      setPortraitUrl(result.portraitUrl);
+    if (result.ok) {
+      setPortraitUrl(data.portraitUrl);
+      setWorldBackdropUrl(data.worldBackdropUrl)
       setShowModal(false);
-	  setHitPoints(5); // TODO: Should not be magic.
+      setHitPoints(MAX_HIT_POINTS);
 
       addMessage({
         sender: 'system',
         content: `Welcome to your adventure, ${gameInfo.playerName}! Simply start typing to get started!`,
       });
-    } catch (error) {
+    } else {
       addMessage({
         sender: 'error',
-        content: error,
+        content: data.content,
       });
     }
   };
 
-  // TODO: Similar to the TODO below; fix the architecture.
-  const handleSendMessage = async() => {
-	  console.log("handleSendMessage called!")
-	  const result = await sendMessage();
-	  console.log(result)
-
-	  if (result.hasOwnProperty('hitPoints') && typeof result.hitPoints == 'number') {
-		  setHitPoints(result.hitPoints);
-	  }
+  const handleSendMessage = async () => {
+    const data = await sendMessage();
+    if (data && data.hasOwnProperty('hitPoints') && typeof data.hitPoints == 'number') {
+      setHitPoints(data.hitPoints);
+    }
   }
 
-  // TODO: Instead of shadowing handleKeyPress, fix the architecture.
-  const handleKeyPress_ = async(e: any) => {
-	if (e.key === 'Enter') {
-		handleSendMessage();
-	}
+  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    switch (e.key) {
+      case 'Enter':
+        handleSendMessage();
+        break;
+      case 'ArrowUp':
+        setInput(getInputPriorTo(input));
+        break;
+      case 'ArrowDown':
+        setInput("");
+        break;
+    }
   }
 
   return (
@@ -75,38 +82,16 @@ function ChatApp() {
         onSubmit={handleFormSubmit}
       />
 
-	{portraitUrl && (
-	  <div className="absolute top-4 right-8 border-4 w-20 h-20 z-2 rounded-xl backdrop-blur-sm shadow-xl border border-white/20 hover:outline-none hover:ring-2 hover:ring-neutral-500">
-		<img
-		  src={portraitUrl}
-		  alt="Player Portrait"
-		  className="w-full h-full object-cover rounded-lg"
-		/>
-	  </div>
-	)}
-
-	{hitPoints >= 0 && (
-  <div className="absolute top-26 right-8 flex gap-1 w-20 justify-end">
-    {Array.from({ length: 5 }).map((_, i) =>
-      i < 5 - hitPoints ? (
-        // Broken heart (lost health)
-        <HeartCrack key={i} className="w-4 h-4 z-3 text-red-400" />
-      ) : (
-        // Full heart
-        <Heart key={i} className="w-4 h-4 z-3 text-red-400 fill-current stroke-none" />
-      )
-    )}
-  </div>
-)}
-
+      <WorldBackdrop url={worldBackdropUrl} />
+      <Portrait url={portraitUrl} />
+      <HitPoints hitPoints={hitPoints} />
 
       <ChatMessages messages={messages} />
-
       <ChatInput
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
-        onKeyPress={handleKeyPress_}
+        onKeyPress={handleKeyPress}
       />
     </div>
   );

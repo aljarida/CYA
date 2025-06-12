@@ -4,11 +4,17 @@ import type {
     FormEvent
 } from 'react';
 
+export type MessageResponse = {
+  sender: 'user' | 'system' | 'error' | 'gamemaster';
+  content: string;
+  hitPoints?: number;
+  gameOverSummary?: string;
+}
+
 export type GameInfo = {
   playerName: string;
   worldTheme: string;
   playerDescription: string;
-  worldDescription: string;
 };
 
 export type FormFieldProps = {
@@ -45,7 +51,7 @@ export type MessageProps = {
 };
 
 export type Message = {
-  sender: 'user' | 'system';
+  sender: 'user' | 'system' | 'error' | 'gamemaster';
   content: string;
 };
 

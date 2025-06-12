@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { Message } from "../misc/types";
+import type { Message, MessageResponse } from "../misc/types";
 
 import { API_RESPONSE_URL } from "../misc/enums";
 import postJsonRequest from "../misc/postjsonrequest";
@@ -13,39 +13,65 @@ const useChat = () => {
     setMessages(prev => [...prev, { sender, content }]);
   };
 
-  const sendMessage = async (): Promise<object | null> => {
+  const sendMessage = async (): Promise<MessageResponse | null> => {
     if (!input.trim()) return null;
-    
+
     const userMessage = input;
     addMessage({ sender: 'user', content: userMessage });
     setInput("");
 
-    try {
-      const result = await postJsonRequest(API_RESPONSE_URL, {
-        content: userMessage,
-      });
-      
-      addMessage({ sender: 'gamemaster', content: result.content });
-	  return result;
-    } catch (error) {
-      addMessage({ sender: 'error', content: "Error fetching message" });
-	  return null;
+    const result = await postJsonRequest(API_RESPONSE_URL, {
+      content: userMessage,
+    });
+    const data: MessageResponse = result.data
+
+    if (result.ok) {
+      addMessage({ sender: data.sender, content: data.content });
+      if (data.gameOverSummary !== undefined) {
+        addMessage({ sender: 'system', content: data.gameOverSummary })
+      }
+    } else {
+      addMessage({ sender: 'error', content: data.content });
     }
+
+    return data;
   };
 
-  const handleKeyPress = (e: any) => {
-    if (e.key === 'Enter') {
-      sendMessage();
+  const getInputPriorTo = (input: string) => {
+    for (let i = messages.length - 1; i > -1; i--) {
+      const inputFound: boolean = (
+        messages[i].sender === 'user' &&
+        messages[i].content === input
+      )
+
+      if (inputFound) {
+        for (let j = i - 1; j >= 0; j--) {
+          const priorUserInput: boolean = messages[j].sender === 'user'
+          if (priorUserInput) {
+            return messages[j].content;
+          }
+        }
+      }
     }
-  };
+
+    for (let i = messages.length - 1; i > -1; i--) {
+      if (messages[i].sender === 'user') {
+        const firstInput: string = messages[i].content;
+        return firstInput;
+      }
+    }
+
+    return "";
+  }
+
 
   return {
     messages,
     input,
     setInput,
     sendMessage,
-    handleKeyPress,
-    addMessage
+    addMessage,
+    getInputPriorTo,
   };
 };
 
