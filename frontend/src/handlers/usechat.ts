@@ -46,9 +46,10 @@ const useChat = () => {
 
       if (inputFound) {
         for (let j = i - 1; j >= 0; j--) {
-          const priorUserInput: boolean = messages[j].sender === 'user'
-          if (priorUserInput) {
-            return messages[j].content;
+          const priorUserInputExists: boolean = messages[j].sender === 'user'
+          if (priorUserInputExists) {
+            const priorUserInput: string = messages[j].content;
+            return priorUserInput;
           }
         }
       }

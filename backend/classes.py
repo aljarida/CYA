@@ -1,41 +1,39 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from enum import Enum, auto
 from typing import Any
-
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
+
+from bson.objectid import ObjectId
 
 MAX_HIT_POINTS: int = 5
 MIN_HIT_POINTS: int = 0
 
 @dataclass
 class State:
-    playerName: str = ""
-    playerDescription: str = ""
-    worldTheme: str = "" 
-    initializationPrompt: str = ""
-    chatHistory: list[Any] = field(default_factory=list)
-    hitPoints: int = MAX_HIT_POINTS
+    _id: ObjectId | None = None
+    player_name: str = ""
+    player_description: str = ""
+    world_theme: str = "" 
+    initialization_prompt: str = ""
+    chat_history: list[Any] = field(default_factory=list)
+    hit_points: int = MAX_HIT_POINTS
+    game_over: bool = False
+    game_over_summary: str = ""
+    created_at: datetime = datetime.today()
+    updated_at: datetime | None = None
 
     def __post_init__(self) -> None:
-        assert MIN_HIT_POINTS <= self.hitPoints <= MAX_HIT_POINTS
+        assert MIN_HIT_POINTS <= self.hit_points <= MAX_HIT_POINTS
 
-# TODO: Complete database for maintaining story states.
-class DBState(declarative_base()):
-    __tablename__ = "states"
+    def serialize(self) -> dict:
+        data: dict = asdict(self)
+        if data["_id"] is None:
+            del data["_id"]
+        return data
 
-    id = Column(String, primary_key=True)
-    player_name = Column(String)
-    player_description = Column(String)
-    world_theme = Column(String)
-    initialization_prompt = Column(String) # TODO: I think this can be removed.
-    chat_history = Column(JSON)
-    hit_points = Column(Integer)
-    game_over = Column(Boolean) # ~== (hit_points == 0)
-    summary = Column(String, nullable=True)
-    created_at = Column(DateTime) # UX information, sorting
-    updated_at = Column(DateTime) # UX information, sorting
+    @classmethod
+    def deserialize(cls, data: dict) -> "State":
+        return cls(**data)
 
 class Sender(Enum):
     GAMEMASTER = auto()

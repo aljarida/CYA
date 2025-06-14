@@ -6,9 +6,9 @@ You are a gamemaster for a text-based adventure.
 The game setting is the following:
 
 === Game setting ===
-Player: {playerName}
-World Theme: {worldTheme}
-Player Description: {playerDescription}
+Player: {player_name}
+World Theme: {world_theme}
+Player Description: {player_description}
 === End of game setting ===
 
 Keep your responses short, approximately one paragraph long.
@@ -24,9 +24,9 @@ If a user writes "I jump off a bridge.", you are expected to address this as an 
 
 def initialization(state: State) -> str:
     prompt: str = INITIALIZATION_PROMPT.format(
-        worldTheme=state.worldTheme,
-        playerName=state.playerName,
-        playerDescription=state.playerDescription,
+        world_theme=state.world_theme,
+        player_name=state.player_name,
+        player_description=state.player_description,
     )
 
     return prompt
@@ -45,17 +45,17 @@ Normal-sized proportions with the portrait done as an oil painting.
 
 The portrait should not look realistic.
 
-The world inhabited by the subject is described as: "{worldTheme}". 
+The world inhabited by the subject is described as: "{world_theme}". 
 
 Pay utmost attention to the following description.
 
-The person is described as: "{playerDescription}". 
+The person is described as: "{player_description}". 
 """
 
 def portrait(state: State) -> str:
     prompt: str = PORTRAIT_PROMPT.format(
-        worldTheme=state.worldTheme,
-        playerDescription=state.playerDescription,
+        world_theme=state.world_theme,
+        player_description=state.player_description,
     )
 
     return prompt
@@ -68,7 +68,7 @@ Landscape or cityscape of a world.
 
 Perspective is up high and far away.
 
-The world is described as: "{worldTheme}". 
+The world is described as: "{world_theme}". 
 
 No text, no logos.
 
@@ -77,7 +77,7 @@ Done as photo-realistic painting.
 
 def backdrop(state: State) -> str:
     prompt: str = BACKDROP_PROMPT.format(
-        worldTheme=state.worldTheme,
+        world_theme=state.world_theme,
     )
 
     return prompt
@@ -111,8 +111,8 @@ Is this user message relevant to the game context and story? Answer only 'true' 
 
 def relevant(state: State, user_message: str) -> tuple[str, str]:
     prompt_user: str = RELEVANT_PROMPT_USER.format(
-        initialization_prompt=state.initializationPrompt,
-        game_story=state.chatHistory[1:],
+        initialization_prompt=state.initialization_prompt,
+        game_story=state.chat_history[1:],
         user_message=user_message,
     )
 
@@ -166,8 +166,8 @@ def damaging(
         ) -> tuple[str, str]:
 
     prompt_user: str = DAMAGING_PROMPT_USER.format(
-        player_description=state.playerDescription,
-        game_story=state.chatHistory[1:-2] if len(state.chatHistory[1:-2]) > 0 else "[No other context.]",
+        player_description=state.player_description,
+        game_story=state.chat_history[1:-2] if len(state.chat_history[1:-2]) > 0 else "[No other context.]",
         user_message=user_message,
         gamemaster_reply=gamemaster_reply,
     )
@@ -200,9 +200,9 @@ def game_over_summmary(
         ) -> tuple[str, str]:
 
     prompt_user: str = GAME_OVER_SUMMARY_PROMPT_USER.format(
-        game_story=state.chatHistory[1:-2] if len(state.chatHistory[1:-2]) > 0 else "[No other context.]",
-        player_name=state.playerName,
-        story=state.chatHistory
+        game_story=state.chat_history[1:-2] if len(state.chat_history[1:-2]) > 0 else "[No other context.]",
+        player_name=state.player_name,
+        story=state.chat_history
     )
     
     return (GAME_OVER_SUMMARY_PROMPT_SYS, prompt_user)

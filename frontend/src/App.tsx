@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { API_INITIALIZE_URL, MAX_HIT_POINTS } from './misc/enums';
+import postJsonRequest from './misc/postjsonrequest';
 
 import useGameInfo from './handlers/usegameinfo';
 import useChat from './handlers/usechat';
@@ -9,7 +10,6 @@ import useChat from './handlers/usechat';
 import SetupModal from './components/SetupModal';
 import ChatMessages from './components/ChatMessages';
 import ChatInput from './components/ChatInput';
-import postJsonRequest from './misc/postjsonrequest';
 import Portrait from './components/Portrait';
 import HitPoints from './components/HitPoints';
 import WorldBackdrop from './components/WorldBackdrop';
@@ -98,4 +98,3 @@ function ChatApp() {
 }
 
 export default ChatApp;
-
