@@ -91,7 +91,7 @@ def setup_initialization_prompt() -> None:
     
     state.initialization_prompt = prompt
 
-def get_gamemaster_reply(user_message) -> str:
+def get_gamemaster_reply(user_message: str) -> str:
     state.chat_history.append({"role": "user", "content": user_message})
     
     response = client.chat.completions.create(
@@ -105,7 +105,7 @@ def get_gamemaster_reply(user_message) -> str:
 
     return reply
 
-def is_relevant(user_message):
+def is_relevant(user_message: str):
     sys, user  = prompts.relevant(state, user_message)
     reply: str = response_with_sys_user(sys, user)
     
@@ -135,7 +135,7 @@ def game_over_summmary() -> str:
 @app.route('/api/existing_games', methods=['GET'])
 def existing_games() -> ResponseReturnValue:
     saves: list[State] = db.all_games()
-    results: list[dict[str, str|bool]] = []
+    results: list[dict[str, Any]] = []
     for s in saves:
         results.append({
             "playerName": s.player_name,
@@ -146,14 +146,15 @@ def existing_games() -> ResponseReturnValue:
             "createdAt": s.created_at.isoformat(),
             "updatedAt": s.updated_at.isoformat() if s.updated_at is not None else "",
             "objectIDString": str(s._id),
+            "chatHistory": s.chat_history,
 
         })
 
-    return jsonify({ "results": results }), 400
+    return jsonify({ "results": results }), 200
 
 @app.route('/api/load_game', methods=['POST'])
 def load_game() -> ResponseReturnValue:
-    data: dict = request.get_json()
+    data: dict[str, Any] = request.get_json()
     _id_string: str | None = data.get('objectIDString')
     if _id_string is None:
         return jsonify({
@@ -162,7 +163,7 @@ def load_game() -> ResponseReturnValue:
             }), 400
 
     _id: ObjectId = ObjectId(_id_string)
-    save_data, ok = db._get_game_data(_id)
+    save_data, ok = db.get_game_data(_id)
     if not ok:
         return jsonify({
                 "sender": str(Sender.ERROR),
@@ -192,7 +193,7 @@ def initialize() -> ResponseReturnValue:
                     "content": f"Missing field: {field}!"
                 }), 400
 
-    camel_case = lambda s: re.sub(r'(?<!^)(?=[A-Z])', '_', s).lower()
+    camel_case: Callable[[str], str] = lambda s: re.sub(r'(?<!^)(?=[A-Z])', '_', s).lower()
     for field in required_fields:
         setattr(state, camel_case(field), data[field])
 

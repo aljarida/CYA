@@ -32,7 +32,7 @@ class Database():
         games = self._games.find({})
         return [State.deserialize(g) for g in games]
     
-    def _get_game_data(self, _id: ObjectId) -> tuple[dict[str, Any] | None, bool]:
+    def get_game_data(self, _id: ObjectId) -> tuple[dict[str, Any] | None, bool]:
         game_data: dict[str, Any] | None = self._games.find_one({ "_id": _id })
         if game_data is None:
             return None, False
@@ -42,7 +42,7 @@ class Database():
         assert(s._id is not None)
 
         current_save_state: dict[str, Any] = State.serialize(s)
-        last_save_state, ok = self._get_game_data(s._id)
+        last_save_state, ok = self.get_game_data(s._id)
         assert(ok and last_save_state is not None and len(current_save_state) == len(last_save_state))
 
         variables_to_update: dict[str, Any]  = {}

@@ -25,14 +25,14 @@ class State:
     def __post_init__(self) -> None:
         assert MIN_HIT_POINTS <= self.hit_points <= MAX_HIT_POINTS
 
-    def serialize(self) -> dict:
-        data: dict = asdict(self)
+    def serialize(self) -> dict[str, Any]:
+        data: dict[str, Any] = asdict(self)
         if data["_id"] is None:
             del data["_id"]
         return data
 
     @classmethod
-    def deserialize(cls, data: dict) -> "State":
+    def deserialize(cls, data: dict[str, Any]) -> "State":
         return cls(**data)
 
 class Sender(Enum):
