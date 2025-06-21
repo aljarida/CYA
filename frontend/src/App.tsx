@@ -24,8 +24,14 @@ function ChatApp() {
   const { gameInfo, isFormValid, handleInputChange } = useGameInfo();
   const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo } = useChat();
 
-  const handleFormSubmit = async (_: FormEvent) => {
-    if (!isFormValid) return;
+  const handleFormSubmit = async (selectedSave: any) => {
+    console.log(selectedSave);
+    if (selectedSave) {
+      selectedSave.chatHistory.forEach((m) => {
+        addMessage({ sender: m.role, content: m.content });
+      });
+    }
+    if (!selectedSave && !isFormValid) return;
 
     setFormSubmitted(true);
 

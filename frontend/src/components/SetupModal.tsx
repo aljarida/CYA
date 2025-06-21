@@ -1,16 +1,40 @@
-import type { SetupModalProps } from '../misc/types';
-import LoadingState from './LoadingState';
-import SetupForm from './SetupForm';
+// src/components/SetupModal.tsx
+import { useState, useEffect } from 'react'
+import type { SetupModalProps } from '../misc/types'
+import LoadingState from './LoadingState'
+import SetupForm from './SetupForm'
+import type { GameSave} from './SetupForm'
 
-function SetupModal({
+const SetupModal = ({
   showModal,
   formSubmitted,
   gameInfo,
   isFormValid,
   handleInputChange,
   onSubmit
-}: SetupModalProps) {
-  if (!showModal) return null;
+}: SetupModalProps) => {
+  const [existingGames, setExistingGames] = useState<GameSave[]>([])
+  const [isLoadingSaves, setIsLoadingSaves] = useState(false)
+  const [selectedSave, setSelectedSave] = useState<GameSave | null>(null)
+
+  useEffect(() => {
+    if (!showModal) return
+
+    setIsLoadingSaves(true)
+    fetch('http://localhost:3000/api/existing_games')
+      .then(res => res.json())
+      .then(data => {
+        const sorted: GameSave[] = (data.results || []).sort(
+          (a: GameSave, b: GameSave) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+        setExistingGames(sorted)
+      })
+      .catch(() => setExistingGames([]))
+      .finally(() => setIsLoadingSaves(false))
+  }, [showModal])
+
+  if (!showModal) return null
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -23,11 +47,15 @@ function SetupModal({
             isFormValid={isFormValid}
             handleInputChange={handleInputChange}
             onSubmit={onSubmit}
+            existingGames={existingGames}
+            isLoadingSaves={isLoadingSaves}
+            selectedSave={selectedSave}
+            setSelectedSave={setSelectedSave}
           />
         )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default SetupModal;
+export default SetupModal
