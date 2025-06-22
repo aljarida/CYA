@@ -3,6 +3,9 @@ from enum import Enum, auto
 from typing import Any
 from datetime import datetime
 
+import requests
+import base64
+
 from bson.objectid import ObjectId
 
 MAX_HIT_POINTS: int = 5
@@ -43,3 +46,37 @@ class Sender(Enum):
 
     def __str__(self) -> str:
         return self.name.lower()
+
+class ImageType(Enum):
+    PORTRAIT = auto()
+    LANDSCAPE = auto()
+
+class Image:
+    def __init__(self, bs: bytes, filename: str) -> None:
+        self.filename: str = filename
+        self.bytes: bytes = bs
+    
+    def json_content(self) -> str:
+        """Encodes bytes for transfer to front-end in Base64."""
+        return "data:image/png;base64," + base64.b64encode(self.bytes).decode("utf-8")
+
+    @staticmethod
+    def bytes_from_url(url: str) -> bytes:
+        response: requests.Response = requests.get(url)
+        response.raise_for_status()
+        bs: bytes | None = response.content
+        assert(bs is not None)
+        return bs
+
+class Images:
+    def __init__(self, _id: ObjectId, portrait_bytes: bytes, landscape_bytes: bytes) -> None:
+        self.portrait: Image = Image(portrait_bytes, self.name_for(_id, ImageType.PORTRAIT))
+        self.landscape: Image = Image(landscape_bytes, self.name_for(_id, ImageType.LANDSCAPE))
+
+    @staticmethod
+    def name_for(_id: ObjectId, it: ImageType) -> str:
+        match it:
+            case ImageType.PORTRAIT:
+                return f"{_id}_portrait"
+            case ImageType.LANDSCAPE:
+                return f"{_id}_landscape"

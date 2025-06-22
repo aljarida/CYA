@@ -31,9 +31,13 @@ export type FormFieldProps = {
 
 export type SetupFormProps = {
   gameInfo: GameInfo;
+  existingGames: GameSave[];
+  isLoadingSaves: boolean;
+  selectedSave: GameSave | null;
+  setSelectedSave: (save: GameSave | null) => void;
   isFormValid: boolean;
   handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSubmit: (e: FormEvent) => void;
+  onSubmit: (save: GameSave | null) => void;
 };
 
 export type SetupModalProps = {
@@ -55,6 +59,15 @@ export type Message = {
   content: string;
 };
 
+export type LoadMessage = {
+  objectIDString: string;
+};
+
+export type ChatHistoryMessage = {
+  role: 'user' | 'system' | 'error' | 'gamemaster';
+  content: string,
+}
+
 
 export type ChatMessagesProps = {
   messages: Message[];
@@ -66,3 +79,15 @@ export type ChatInputProps = {
   onSend: () => void;
   onKeyPress: (e: KeyboardEvent<HTMLInputElement>) => void;
 };
+
+export type GameSave = {
+  playerName: string
+  playerDescription: string
+  worldTheme: string
+  gameOverSummary: string
+  gameOver: boolean
+  createdAt: string
+  updatedAt: string
+  objectIDString: string
+  chatHistory: any[]
+}

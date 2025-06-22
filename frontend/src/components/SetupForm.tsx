@@ -1,25 +1,7 @@
 // src/components/SetupForm.tsx
-import type { SetupFormProps } from '../misc/types'
+import type { SetupFormProps, GameSave } from '../misc/types'
 import FormField from './FormField'
 
-export type GameSave = {
-  playerName: string
-  playerDescription: string
-  worldTheme: string
-  gameOverSummary: string
-  gameOver: boolean
-  createdAt: string
-  updatedAt: string
-  objectIDString: string
-  chatHistory: any[]
-}
-
-export interface UpdatedSetupFormProps extends SetupFormProps {
-  existingGames: GameSave[]
-  isLoadingSaves: boolean
-  selectedSave: GameSave | null
-  setSelectedSave: (save: GameSave | null) => void
-}
 
 const SetupForm = ({
   gameInfo,
@@ -30,13 +12,13 @@ const SetupForm = ({
   isLoadingSaves,
   selectedSave,
   setSelectedSave
-}: UpdatedSetupFormProps) => {
+}: SetupFormProps) => {
   return (
     <>
       <h2 className="text-2xl font-bold text-neutral-200 mb-6">Adventure Setup</h2>
 
       {isLoadingSaves ? (
-        <p className="text-neutral-400">Loading saved games…</p>
+        <p className="text-neutral-400">Loading game saves…</p>
       ) : existingGames.length > 0 ? (
         <div className="mb-6">
           <label className="block text-neutral-300 mb-2">Load Existing Game</label>
@@ -44,12 +26,12 @@ const SetupForm = ({
             className="w-full p-2 rounded-md bg-neutral-800 text-neutral-100"
             value={selectedSave?.objectIDString || ''}
             onChange={(e) => {
-              const sel = existingGames.find(g => g.objectIDString === e.target.value) || null
-              setSelectedSave(sel)
+              const save = existingGames.find(g => g.objectIDString === e.target.value) || null
+              setSelectedSave(save)
             }}
           >
-            <option value="">— Start New Adventure —</option>
-            {existingGames.map((g) => (
+            <option value="">Start New Adventure</option>
+            {existingGames.map((g: GameSave) => (
               <option key={g.objectIDString} value={g.objectIDString}>
                 {g.playerName} — {g.worldTheme}
               </option>
@@ -61,12 +43,12 @@ const SetupForm = ({
       {selectedSave ? (
         <button
           onClick={() => onSubmit(selectedSave)}
-          className="w-full py-3 mt-4 bg-green-700 hover:bg-green-600 rounded-lg text-white shadow-md transition-colors"
+          className="w-full py-3 mt-4 bg-green-700/60 hover:bg-green-600/60 rounded-lg text-white shadow-md transition-colors"
         >
           Continue Adventure
         </button>
       ) : (
-        <div>
+        <div className="space-y-5">
           <FormField
             id="playerName"
             name="playerName"
@@ -102,7 +84,7 @@ const SetupForm = ({
             disabled={!isFormValid}
             className={`w-full py-3 rounded-lg shadow-lg mt-4 transition-colors backdrop-blur-sm ${
               isFormValid
-                ? 'bg-neutral-700/80 hover:bg-neutral-600/80 text-neutral-200 border border-neutral-600/50'
+                ? 'bg-green-700/70 hover:bg-green-600/70 text-neutral-200 border border-neutral-600/50'
                 : 'bg-neutral-800/60 text-neutral-500 cursor-not-allowed border border-neutral-700/30'
             }`}
           >

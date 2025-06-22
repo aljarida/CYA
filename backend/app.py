@@ -10,11 +10,12 @@ from dotenv import load_dotenv
 from typing import Any, Callable
 import os
 import re
+import requests
 
 from bson.objectid import ObjectId
 
 import prompts
-from classes import State, Sender
+from classes import State, Sender, Images, Image
 from database import Database
 
 PLACEHOLDER_PORTRAIT_URL = "https://upload.wikimedia.org/wikipedia/commons/4/4b/Josef_Bergenthal_oil_painting_portrait.jpg"
@@ -32,10 +33,11 @@ state: State = State()
 
 db: Database = Database()
 
+
 def empty_str_if_none(reply: str | None) -> str:
     return reply if reply is not None else ""
 
-def paint_player() -> str:
+def get_portrait_url() -> str:
     if DEBUG_MODE:
         return PLACEHOLDER_PORTRAIT_URL
 
@@ -52,7 +54,7 @@ def paint_player() -> str:
     except:
         return PLACEHOLDER_PORTRAIT_URL
     
-def paint_world() -> str:
+def get_landscape_url() -> str:
     if DEBUG_MODE:
         return PLACEHOLDER_BACKDROP_URL
 
@@ -68,6 +70,16 @@ def paint_world() -> str:
         return empty_str_if_none(result.data[0].url)
     except Exception as e:
         return str(e)
+
+def get_images(s: State) -> Images:
+    assert(s._id is not None)
+    portrait_url: str = get_portrait_url()
+    landscape_url: str = get_landscape_url()
+    return Images(
+        s._id,
+        Image.bytes_from_url(portrait_url),
+        Image.bytes_from_url(landscape_url),
+    )
 
 def response_with_sys_user(sys_content: str, user_content: str) -> str:
     response: ChatCompletion = client.chat.completions.create(
@@ -152,6 +164,9 @@ def existing_games() -> ResponseReturnValue:
 
     return jsonify({ "results": results }), 200
 
+
+# TODO: Update logic to obtain images from database and then
+# send them to the front end for display.
 @app.route('/api/load_game', methods=['POST'])
 def load_game() -> ResponseReturnValue:
     data: dict[str, Any] = request.get_json()
@@ -198,10 +213,10 @@ def initialize() -> ResponseReturnValue:
         setattr(state, camel_case(field), data[field])
 
     setup_initialization_prompt()
-    portrait_url: str = paint_player()
-    world_backdrop_url: str = paint_world()
+    images: Images = get_images(state)
 
-    db.save_game(state)
+    # TODO: Change API interactions to ensure that bytes can be sent over.
+    db.save_game_and_images(state, images)
     return jsonify({
         "sender": str(Sender.SYSTEM),
         "systemPrompt": state.initialization_prompt,

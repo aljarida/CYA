@@ -1,9 +1,8 @@
 // src/components/SetupModal.tsx
 import { useState, useEffect } from 'react'
-import type { SetupModalProps } from '../misc/types'
+import type { SetupModalProps, GameSave } from '../misc/types'
 import LoadingState from './LoadingState'
 import SetupForm from './SetupForm'
-import type { GameSave} from './SetupForm'
 
 const SetupModal = ({
   showModal,

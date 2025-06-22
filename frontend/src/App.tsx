@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
 
-import { API_INITIALIZE_URL, MAX_HIT_POINTS } from './misc/enums';
+import { API_INITIALIZE_URL, API_LOAD_GAME_URL, MAX_HIT_POINTS } from './misc/enums';
 import postJsonRequest from './misc/postjsonrequest';
 
 import useGameInfo from './handlers/usegameinfo';
@@ -13,6 +12,7 @@ import ChatInput from './components/ChatInput';
 import Portrait from './components/Portrait';
 import HitPoints from './components/HitPoints';
 import WorldBackdrop from './components/WorldBackdrop';
+import type { ChatHistoryMessage, GameSave, LoadMessage } from './misc/types';
 
 function ChatApp() {
   const [showModal, setShowModal] = useState(true);
@@ -24,36 +24,51 @@ function ChatApp() {
   const { gameInfo, isFormValid, handleInputChange } = useGameInfo();
   const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo } = useChat();
 
-  const handleFormSubmit = async (selectedSave: any) => {
-    console.log(selectedSave);
-    if (selectedSave) {
-      selectedSave.chatHistory.forEach((m) => {
-        addMessage({ sender: m.role, content: m.content });
-      });
-    }
+  const handleFormSubmit = async (selectedSave: GameSave) => {
     if (!selectedSave && !isFormValid) return;
 
     setFormSubmitted(true);
-
-    const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
-    const data = result.data;
-
-    if (result.ok) {
-      setPortraitUrl(data.portraitUrl);
-      setWorldBackdropUrl(data.worldBackdropUrl)
-      setShowModal(false);
-      setHitPoints(MAX_HIT_POINTS);
-
-      addMessage({
-        sender: 'system',
-        content: `Welcome to your adventure, ${gameInfo.playerName}! Simply start typing to get started!`,
+    const loadedSavedGame: boolean = selectedSave !== null;
+    if (loadedSavedGame) {
+      // Load the game save on the backend.
+      const loadMessage: LoadMessage = {
+        objectIDString: selectedSave.objectIDString
+      };
+      const result = await postJsonRequest(API_LOAD_GAME_URL, loadMessage);
+      console.assert(result.ok, `Fatal error loading game: ${result.data}`)
+      const data = result.data;
+      addMessage({ "sender": data.sender, "content": data.content })
+      
+      // Render all prior chats.
+      selectedSave.chatHistory.forEach((m: ChatHistoryMessage, idx: number) => {
+        if (idx === 0) return;
+        addMessage({ sender: m.role, content: m.content });
       });
+
     } else {
-      addMessage({
-        sender: 'error',
-        content: data.content,
-      });
+      // Handle initializing a new game.
+      const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
+      const data = result.data;
+
+      if (result.ok) {
+        setPortraitUrl(data.portraitUrl);
+        setWorldBackdropUrl(data.worldBackdropUrl)
+        setHitPoints(MAX_HIT_POINTS);
+
+        addMessage({
+          sender: 'system',
+          content: `Welcome to your adventure, ${gameInfo.playerName}! Simply start typing to get started!`,
+        });
+      } else {
+        addMessage({
+          sender: 'error',
+          content: data.content,
+        });
+      }
     }
+
+    setShowModal(false);
+
   };
 
   const handleSendMessage = async () => {

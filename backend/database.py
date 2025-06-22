@@ -3,10 +3,11 @@ from dotenv import load_dotenv
 from datetime import datetime
 import os
 
+import gridfs
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
-from classes import State
+from classes import State, Images, ImageType
 
 CLUSTER: str = "cya"
 COLLECTION: str = "games"
@@ -19,6 +20,7 @@ class Database():
         self._client: MongoClient = MongoClient(key)
         self._database  = self._client.get_database(CLUSTER)
         self._games = self._database.get_collection(COLLECTION)
+        self._fs = gridfs.GridFS(self._database)
 
     def save_game(self, s: State) -> None:
         if s._id is not None:
@@ -27,6 +29,41 @@ class Database():
             result = self._games.insert_one(State.serialize(s))
             assert(type(result.inserted_id) == ObjectId)
             s._id = result.inserted_id
+
+    # TODO: Define following function.
+    def save_game_and_images(self, s: State, images: Images) -> None:
+        # TODO: Save the game.
+        # TODO: Save the images.
+        pass
+
+    def _save_images(self, images: Images) -> None:
+        existing = self._fs.find_one({
+            '$or': [
+                { 'filename': images.portrait.filename },
+                { 'filename': images.landscape.filename },
+            ],
+        })
+        assert(existing is not None)
+        self._fs.put(images.portrait.bytes, filename=images.portrait.filename)
+        self._fs.put(images.landscape.bytes, filename=images.landscape.filename)
+
+    def get_images(self, _id: ObjectId) -> dict[ImageType, bytes]:
+        """Given a state's unique ID, returns the relevant game images."""
+        res: dict[ImageType, bytes] = {}
+        images: list[tuple[str, ImageType]] = [
+            (
+                Images.name_for(_id, it),
+                it,
+            )
+            for it in ImageType
+        ]
+
+        for img_name, img_type in images:
+            file = self._fs.find_one({ 'filename': img_name })
+            assert(file is not None)
+            res[img_type] = file.read()
+
+        return res
 
     def all_games(self) -> list[State]:
         games = self._games.find({})
