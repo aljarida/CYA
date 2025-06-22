@@ -10,18 +10,17 @@ from dotenv import load_dotenv
 from typing import Any, Callable
 import os
 import re
-import requests
 
 from bson.objectid import ObjectId
 
 import prompts
-from classes import State, Sender, Images, Image
+from classes import MAX_HIT_POINTS, State, Sender, Images, Image, ImageType
 from database import Database
 
 PLACEHOLDER_PORTRAIT_URL = "https://upload.wikimedia.org/wikipedia/commons/4/4b/Josef_Bergenthal_oil_painting_portrait.jpg"
 PLACEHOLDER_BACKDROP_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/%28Venice%29_Rape_of_Europa_by_Francesco_Zuccarelli_-_Gallerie_Accademia.jpg/1024px-%28Venice%29_Rape_of_Europa_by_Francesco_Zuccarelli_-_Gallerie_Accademia.jpg"
 
-DEBUG_MODE: bool = True
+DEBUG_MODE: bool = False
 
 app: Flask = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -33,48 +32,55 @@ state: State = State()
 
 db: Database = Database()
 
-
 def empty_str_if_none(reply: str | None) -> str:
     return reply if reply is not None else ""
 
-def get_portrait_url() -> str:
-    if DEBUG_MODE:
-        return PLACEHOLDER_PORTRAIT_URL
+def get_new_images_for(s: State) -> Images:
+    """Obtain portrait and backdrop images given that a provided State object with a valid _id."""
+    assert(s._id is None)
 
-    prompt: str = prompts.portrait(state)
-    try:
-        result: ImagesResponse = client.images.generate(
-            model="dall-e-2",
-            prompt=prompt,
-            size="512x512",
-            n=1
-        )
+    def get_portrait_url() -> str:
+        """Obtain debug image portrait URL or generate a new portrait image URL."""
+        if DEBUG_MODE:
+            return PLACEHOLDER_PORTRAIT_URL
 
-        return empty_str_if_none(result.data[0].url)
-    except:
-        return PLACEHOLDER_PORTRAIT_URL
-    
-def get_landscape_url() -> str:
-    if DEBUG_MODE:
-        return PLACEHOLDER_BACKDROP_URL
+        prompt: str = prompts.portrait(state)
+        try:
+            result: ImagesResponse = client.images.generate(
+                model="dall-e-2",
+                prompt=prompt,
+                size="512x512",
+                n=1
+            )
 
-    prompt: str = prompts.backdrop(state)
-    try:
-        result: ImagesResponse = client.images.generate(
-            model="dall-e-2",
-            prompt=prompt,
-            size="1024x1024",
-            n=1
-        )
+            return empty_str_if_none(result.data[0].url)
+        except:
+            return PLACEHOLDER_PORTRAIT_URL
+        
+    def get_landscape_url() -> str:
+        """Obtain debug image landscape URL or generate a new landscape image URL."""
+        if DEBUG_MODE:
+            return PLACEHOLDER_BACKDROP_URL
 
-        return empty_str_if_none(result.data[0].url)
-    except Exception as e:
-        return str(e)
+        prompt: str = prompts.backdrop(state)
+        try:
+            result: ImagesResponse = client.images.generate(
+                model="dall-e-2",
+                prompt=prompt,
+                size="1024x1024",
+                n=1
+            )
 
-def get_images(s: State) -> Images:
+            return empty_str_if_none(result.data[0].url)
+        except Exception as e:
+            return str(e)
+
+    db.save_game(s)
     assert(s._id is not None)
+
     portrait_url: str = get_portrait_url()
     landscape_url: str = get_landscape_url()
+
     return Images(
         s._id,
         Image.bytes_from_url(portrait_url),
@@ -184,14 +190,18 @@ def load_game() -> ResponseReturnValue:
                 "sender": str(Sender.ERROR),
                 "content": f"Provided save ID {_id_string} is not valid."
             }), 400
-
     assert(save_data is not None)
     for key in save_data.keys():
         setattr(state, key, save_data[key])
-
+    
+    images: dict[ImageType, bytes]  = db.get_images(_id)
     return jsonify({
             "sender": str(Sender.SYSTEM),
-            "content": "Game state successfully loaded."
+            "content": "Game state successfully loaded.",
+            # TODO: Clean this logic up. It's ugly.
+            "portraitUrl": Image.json_content_from_bytes(images[ImageType.PORTRAIT]),
+            "worldBackdropUrl": Image.json_content_from_bytes(images[ImageType.LANDSCAPE]),
+            "hitPoints": state.hit_points,
         }), 200
 
 
@@ -213,15 +223,16 @@ def initialize() -> ResponseReturnValue:
         setattr(state, camel_case(field), data[field])
 
     setup_initialization_prompt()
-    images: Images = get_images(state)
+    images: Images = get_new_images_for(state)
 
     # TODO: Change API interactions to ensure that bytes can be sent over.
     db.save_game_and_images(state, images)
     return jsonify({
         "sender": str(Sender.SYSTEM),
         "systemPrompt": state.initialization_prompt,
-        "portraitUrl": portrait_url,
-        "worldBackdropUrl": world_backdrop_url,
+        "portraitUrl": images.portrait.json_content(), # NOTE: This a temporary value.
+        "worldBackdropUrl": images.landscape.json_content(), # NOTE: This is a temporary value.
+        "hitPoints": MAX_HIT_POINTS,
     }), 200
 
 @app.route('/api/response', methods=['POST'])

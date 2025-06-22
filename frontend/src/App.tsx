@@ -27,6 +27,7 @@ function ChatApp() {
   const handleFormSubmit = async (selectedSave: GameSave) => {
     if (!selectedSave && !isFormValid) return;
 
+    let data;
     setFormSubmitted(true);
     const loadedSavedGame: boolean = selectedSave !== null;
     if (loadedSavedGame) {
@@ -36,7 +37,7 @@ function ChatApp() {
       };
       const result = await postJsonRequest(API_LOAD_GAME_URL, loadMessage);
       console.assert(result.ok, `Fatal error loading game: ${result.data}`)
-      const data = result.data;
+      data = result.data;
       addMessage({ "sender": data.sender, "content": data.content })
       
       // Render all prior chats.
@@ -48,12 +49,9 @@ function ChatApp() {
     } else {
       // Handle initializing a new game.
       const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
-      const data = result.data;
+      data = result.data;
 
       if (result.ok) {
-        setPortraitUrl(data.portraitUrl);
-        setWorldBackdropUrl(data.worldBackdropUrl)
-        setHitPoints(MAX_HIT_POINTS);
 
         addMessage({
           sender: 'system',
@@ -65,8 +63,12 @@ function ChatApp() {
           content: data.content,
         });
       }
+      
     }
 
+    setHitPoints(data.maxHitPoints);
+    setPortraitUrl(data.portraitUrl);
+    setWorldBackdropUrl(data.worldBackdropUrl)
     setShowModal(false);
 
   };

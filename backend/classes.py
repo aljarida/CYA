@@ -60,9 +60,20 @@ class Image:
         """Encodes bytes for transfer to front-end in Base64."""
         return "data:image/png;base64," + base64.b64encode(self.bytes).decode("utf-8")
 
+
+    @staticmethod
+    def json_content_from_bytes(bs: bytes):
+        return "data:image/png;base64," + base64.b64encode(bs).decode("utf-8")
+
+
     @staticmethod
     def bytes_from_url(url: str) -> bytes:
-        response: requests.Response = requests.get(url)
+        is_wikipedia: bool = "wikipedia" in url
+        if is_wikipedia:
+            response: requests.Response = requests.get(url, headers={'User-Agent': '...'})
+        else:
+            response: requests.Response = requests.get(url)
+        
         response.raise_for_status()
         bs: bytes | None = response.content
         assert(bs is not None)
@@ -80,3 +91,4 @@ class Images:
                 return f"{_id}_portrait"
             case ImageType.LANDSCAPE:
                 return f"{_id}_landscape"
+

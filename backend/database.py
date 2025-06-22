@@ -30,20 +30,11 @@ class Database():
             assert(type(result.inserted_id) == ObjectId)
             s._id = result.inserted_id
 
-    # TODO: Define following function.
     def save_game_and_images(self, s: State, images: Images) -> None:
-        # TODO: Save the game.
-        # TODO: Save the images.
-        pass
+        self.save_game(s)
+        self._save_images(images)
 
     def _save_images(self, images: Images) -> None:
-        existing = self._fs.find_one({
-            '$or': [
-                { 'filename': images.portrait.filename },
-                { 'filename': images.landscape.filename },
-            ],
-        })
-        assert(existing is not None)
         self._fs.put(images.portrait.bytes, filename=images.portrait.filename)
         self._fs.put(images.landscape.bytes, filename=images.landscape.filename)
 
