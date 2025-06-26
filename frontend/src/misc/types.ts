@@ -1,7 +1,6 @@
 import type {
     ChangeEvent,
     KeyboardEvent,
-    FormEvent
 } from 'react';
 
 export type MessageResponse = {
@@ -37,7 +36,7 @@ export type SetupFormProps = {
   setSelectedSave: (save: GameSave | null) => void;
   isFormValid: boolean;
   handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSubmit: (save: GameSave | null) => void;
+  onSubmit: (save: GameSave | null) => Promise<void>;
 };
 
 export type SetupModalProps = {
@@ -46,7 +45,7 @@ export type SetupModalProps = {
   gameInfo: GameInfo;
   isFormValid: boolean;
   handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSubmit: (e: FormEvent) => void;
+  onSubmit: (save: GameSave | null) => Promise<void>;
 };
 
 export type MessageProps = {

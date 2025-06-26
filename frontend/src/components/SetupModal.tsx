@@ -4,14 +4,14 @@ import type { SetupModalProps, GameSave } from '../misc/types'
 import LoadingState from './LoadingState'
 import SetupForm from './SetupForm'
 
-const SetupModal = ({
+function SetupModal({
   showModal,
   formSubmitted,
   gameInfo,
   isFormValid,
   handleInputChange,
   onSubmit
-}: SetupModalProps) => {
+}: SetupModalProps) {
   const [existingGames, setExistingGames] = useState<GameSave[]>([])
   const [isLoadingSaves, setIsLoadingSaves] = useState(false)
   const [selectedSave, setSelectedSave] = useState<GameSave | null>(null)

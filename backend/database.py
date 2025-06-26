@@ -38,23 +38,22 @@ class Database():
         self._fs.put(images.portrait.bytes, filename=images.portrait.filename)
         self._fs.put(images.landscape.bytes, filename=images.landscape.filename)
 
-    def get_images(self, _id: ObjectId) -> dict[ImageType, bytes]:
+    def get_image_bytes(self, _id: ObjectId) -> tuple[bytes, bytes]:
         """Given a state's unique ID, returns the relevant game images."""
-        res: dict[ImageType, bytes] = {}
-        images: list[tuple[str, ImageType]] = [
-            (
-                Images.name_for(_id, it),
-                it,
-            )
-            for it in ImageType
+        image_filepaths: list[str] = [
+            Images.name_for(_id, ImageType.PORTRAIT),
+            Images.name_for(_id, ImageType.LANDSCAPE),
         ]
 
-        for img_name, img_type in images:
-            file = self._fs.find_one({ 'filename': img_name })
+        def _get_bytes(filename: str) -> bytes:
+            file = self._fs.find_one({ 'filename': filename })
             assert(file is not None)
-            res[img_type] = file.read()
+            return file.read()
 
-        return res
+        return (
+            _get_bytes(image_filepaths[0]),
+            _get_bytes(image_filepaths[1]),
+        )
 
     def all_games(self) -> list[State]:
         games = self._games.find({})

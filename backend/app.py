@@ -14,7 +14,7 @@ import re
 from bson.objectid import ObjectId
 
 import prompts
-from classes import MAX_HIT_POINTS, State, Sender, Images, Image, ImageType
+from classes import MAX_HIT_POINTS, State, Sender, Images, Image
 from database import Database
 
 PLACEHOLDER_PORTRAIT_URL = "https://upload.wikimedia.org/wikipedia/commons/4/4b/Josef_Bergenthal_oil_painting_portrait.jpg"
@@ -47,9 +47,9 @@ def get_new_images_for(s: State) -> Images:
         prompt: str = prompts.portrait(state)
         try:
             result: ImagesResponse = client.images.generate(
-                model="dall-e-2",
+                model="dall-e-3",
                 prompt=prompt,
-                size="512x512",
+                size="1024x1024",
                 n=1
             )
 
@@ -65,9 +65,9 @@ def get_new_images_for(s: State) -> Images:
         prompt: str = prompts.backdrop(state)
         try:
             result: ImagesResponse = client.images.generate(
-                model="dall-e-2",
+                model="dall-e-3",
                 prompt=prompt,
-                size="1024x1024",
+                size="1792x1024",
                 n=1
             )
 
@@ -98,7 +98,6 @@ def response_with_sys_user(sys_content: str, user_content: str) -> str:
     )
     reply: str = empty_str_if_none(response.choices[0].message.content)
     return reply
-
 
 def setup_initialization_prompt() -> None:
     prompt: str = prompts.initialization(state)
@@ -170,9 +169,6 @@ def existing_games() -> ResponseReturnValue:
 
     return jsonify({ "results": results }), 200
 
-
-# TODO: Update logic to obtain images from database and then
-# send them to the front end for display.
 @app.route('/api/load_game', methods=['POST'])
 def load_game() -> ResponseReturnValue:
     data: dict[str, Any] = request.get_json()
@@ -194,20 +190,20 @@ def load_game() -> ResponseReturnValue:
     for key in save_data.keys():
         setattr(state, key, save_data[key])
     
-    images: dict[ImageType, bytes]  = db.get_images(_id)
+    portrait_bytes, landscape_bytes = db.get_image_bytes(_id)
     return jsonify({
             "sender": str(Sender.SYSTEM),
             "content": "Game state successfully loaded.",
-            # TODO: Clean this logic up. It's ugly.
-            "portraitUrl": Image.json_content_from_bytes(images[ImageType.PORTRAIT]),
-            "worldBackdropUrl": Image.json_content_from_bytes(images[ImageType.LANDSCAPE]),
+            "portraitUrl": Image.json_content_from_bytes(portrait_bytes),
+            "worldBackdropUrl": Image.json_content_from_bytes(landscape_bytes),
             "hitPoints": state.hit_points,
         }), 200
 
-
-
 @app.route('/api/initialize', methods=['POST'])
 def initialize() -> ResponseReturnValue:
+    global state # NOTE: Temporary while in development.
+    state = State()
+
     data: dict[str, Any] = request.get_json()
     required_fields: list[str] = ["playerName", "playerDescription", "worldTheme"]
     
@@ -225,13 +221,13 @@ def initialize() -> ResponseReturnValue:
     setup_initialization_prompt()
     images: Images = get_new_images_for(state)
 
-    # TODO: Change API interactions to ensure that bytes can be sent over.
     db.save_game_and_images(state, images)
+    # TODO: Rename ...Url to be ...Src because these can be URLs or bytes.
     return jsonify({
         "sender": str(Sender.SYSTEM),
         "systemPrompt": state.initialization_prompt,
-        "portraitUrl": images.portrait.json_content(), # NOTE: This a temporary value.
-        "worldBackdropUrl": images.landscape.json_content(), # NOTE: This is a temporary value.
+        "portraitUrl": images.portrait.json_content(),
+        "worldBackdropUrl": images.landscape.json_content(),
         "hitPoints": MAX_HIT_POINTS,
     }), 200
 

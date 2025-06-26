@@ -26,7 +26,7 @@ class State:
     updated_at: datetime | None = None
 
     def __post_init__(self) -> None:
-        assert MIN_HIT_POINTS <= self.hit_points <= MAX_HIT_POINTS
+        assert(MIN_HIT_POINTS <= self.hit_points <= MAX_HIT_POINTS)
 
     def serialize(self) -> dict[str, Any]:
         data: dict[str, Any] = asdict(self)

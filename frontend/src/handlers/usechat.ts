@@ -37,28 +37,24 @@ const useChat = () => {
     return data;
   };
 
-  const getInputPriorTo = (input: string) => {
-    for (let i = messages.length - 1; i > -1; i--) {
-      const inputFound: boolean = (
-        messages[i].sender === 'user' &&
-        messages[i].content === input
-      )
+  const getInputPriorTo = (givenMsg: string) => {
+    const noGivenMsg: boolean = givenMsg === "";
+    let usrMsgFound: boolean = false;
 
-      if (inputFound) {
-        for (let j = i - 1; j >= 0; j--) {
-          const priorUserInputExists: boolean = messages[j].sender === 'user'
-          if (priorUserInputExists) {
-            const priorUserInput: string = messages[j].content;
-            return priorUserInput;
-          }
-        }
+    let i = messages.length - 1;
+    for (; i > -1; i--) {
+      usrMsgFound = (messages[i].sender === 'user');
+      if (usrMsgFound && noGivenMsg) {
+        return messages[i].content;
+      } else if (usrMsgFound && messages[i].content === input) {
+        break;
       }
     }
 
-    for (let i = messages.length - 1; i > -1; i--) {
-      if (messages[i].sender === 'user') {
-        const firstInput: string = messages[i].content;
-        return firstInput;
+    if (usrMsgFound) {
+      for (let j = i - 1; j >= 0; j--) {
+        const priorUsrMsg: boolean = messages[j].sender === 'user';
+        if (priorUsrMsg) return messages[j].content;
       }
     }
 

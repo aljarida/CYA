@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { API_INITIALIZE_URL, API_LOAD_GAME_URL, MAX_HIT_POINTS } from './misc/enums';
+import { API_INITIALIZE_URL, API_LOAD_GAME_URL, } from './misc/enums';
 import postJsonRequest from './misc/postjsonrequest';
 
 import useGameInfo from './handlers/usegameinfo';
@@ -24,13 +24,12 @@ function ChatApp() {
   const { gameInfo, isFormValid, handleInputChange } = useGameInfo();
   const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo } = useChat();
 
-  const handleFormSubmit = async (selectedSave: GameSave) => {
+  const handleFormSubmit = async (selectedSave: GameSave | null) => {
     if (!selectedSave && !isFormValid) return;
 
     let data;
     setFormSubmitted(true);
-    const loadedSavedGame: boolean = selectedSave !== null;
-    if (loadedSavedGame) {
+    if (selectedSave !== null) {
       // Load the game save on the backend.
       const loadMessage: LoadMessage = {
         objectIDString: selectedSave.objectIDString
@@ -70,7 +69,6 @@ function ChatApp() {
     setPortraitUrl(data.portraitUrl);
     setWorldBackdropUrl(data.worldBackdropUrl)
     setShowModal(false);
-
   };
 
   const handleSendMessage = async () => {

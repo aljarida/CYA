@@ -3,7 +3,7 @@ import type { SetupFormProps, GameSave } from '../misc/types'
 import FormField from './FormField'
 
 
-const SetupForm = ({
+function SetupForm({
   gameInfo,
   isFormValid,
   handleInputChange,
@@ -12,7 +12,7 @@ const SetupForm = ({
   isLoadingSaves,
   selectedSave,
   setSelectedSave
-}: SetupFormProps) => {
+}: SetupFormProps) {
   return (
     <>
       <h2 className="text-2xl font-bold text-neutral-200 mb-6">Adventure Setup</h2>
