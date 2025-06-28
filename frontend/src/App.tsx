@@ -59,6 +59,11 @@ function ChatApp() {
         addMessage({ sender: m.role, content: m.content });
       });
 
+      if (selectedSave.gameOverSummary) {
+        addMessage({ "sender": "system", "content": "Oh, no! Unfortunately, you have died!"})
+        addMessage({ "sender": "system", "content": selectedSave.gameOverSummary })
+      }
+
     } else {
       // Handle initializing a new game.
       const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
@@ -79,7 +84,7 @@ function ChatApp() {
       
     }
 
-    setHitPoints(data.maxHitPoints);
+    setHitPoints(data.hitPoints);
     setPortraitSrc(data.portraitSrc);
     setWorldBackdropSrc(data.worldBackdropSrc)
     setShowModal(false);
@@ -88,7 +93,13 @@ function ChatApp() {
   const handleSendMessage = async () => {
     const data = await sendMessage();
     if (data && data.hasOwnProperty('hitPoints') && typeof data.hitPoints == 'number') {
-      setHitPoints(data.hitPoints);
+      const lostHitpoints: number = hitPoints - data.hitPoints;
+      if (lostHitpoints) {
+        setHitPoints(data.hitPoints);
+        if (data.hitPoints > 0) {
+          addMessage({ "sender": "system", "content": `You lost ${lostHitpoints} health!` })
+        }
+      }
     }
   }
 

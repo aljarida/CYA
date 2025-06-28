@@ -18,11 +18,8 @@ function SetupForm({
 }: SetupFormProps) {
   const [clickedDelete, setClickedDelete] = useState<boolean>(false);
   function requestDelete(save: GameSave) {
-    if (clickedDelete) {
-      deleteGame(save);
-    }
-
-    if (!clickedDelete) {
+    if (clickedDelete) deleteGame(save);
+    else {
       setClickedDelete(true);
       setTimeout(() => setClickedDelete(false), 2000);
     }
@@ -58,6 +55,12 @@ function SetupForm({
       {selectedSave ? (
         <>
           <button
+            onClick={() => onSubmit(selectedSave)}
+            className="w-full py-3 mt-4 bg-green-700/60 hover:bg-green-600/60 rounded-lg text-white shadow-md transition-colors"
+          >
+            Continue Adventure
+          </button>
+          <button
             onClick={() => requestDelete(selectedSave)}
             className={`w-full py-3 mt-4 bg-red-700/60 hover:bg-red-600/60
               rounded-lg text-white shadow-md transition-colors
@@ -65,12 +68,6 @@ function SetupForm({
             style={clickedDelete ? { animationDuration: '0.5s' } : undefined}
           >
             {clickedDelete ? "Confirm Deletion" : "Delete Adventure"}
-          </button>
-          <button
-            onClick={() => onSubmit(selectedSave)}
-            className="w-full py-3 mt-4 bg-green-700/60 hover:bg-green-600/60 rounded-lg text-white shadow-md transition-colors"
-          >
-            Continue Adventure
           </button>
         </>
       ) : (

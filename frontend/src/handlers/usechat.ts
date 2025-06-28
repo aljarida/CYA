@@ -92,7 +92,7 @@ const useChat = () => {
     sendMessage,
     addMessage,
     getInputPriorTo,
-	getInputAfter,
+	  getInputAfter,
   };
 };
 

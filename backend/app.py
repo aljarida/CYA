@@ -101,8 +101,17 @@ def setup_initialization_prompt() -> None:
     
     state.initialization_prompt = prompt
 
-def get_gamemaster_reply(user_message: str) -> str:
+def game_over():
+    state.game_over = True
+    state.game_over_summary = game_over_summmary()
+
+def update_chat_history(user_message: str, gamemaster_reply: str | None) -> None:
     state.chat_history.append({"role": "user", "content": user_message})
+    if gamemaster_reply is not None:
+        state.chat_history.append({"role": "assistant", "content": gamemaster_reply})
+
+def get_gamemaster_reply(user_message: str) -> str:
+    state.chat_history.append({"role": "user", "content": user_message}) # Temporarily append.
     
     response = client.chat.completions.create(
         model="gpt-4.1",
@@ -111,11 +120,10 @@ def get_gamemaster_reply(user_message: str) -> str:
     
     reply: str = empty_str_if_none(response.choices[0].message.content)
     
-    state.chat_history.append({"role": "assistant", "content": reply})
-
+    state.chat_history.pop() # Pop to keep state unaffected by function call.
     return reply
 
-def is_relevant(user_message: str):
+def is_relevant(user_message: str) -> bool:
     sys, user  = prompts.relevant(state, user_message)
     reply: str = response_with_sys_user(sys, user)
     
@@ -125,7 +133,7 @@ def is_relevant(user_message: str):
         case _:
             return False
 
-def is_realistic(user_message: str):
+def is_realistic(user_message: str) -> bool:
     sys, user  = prompts.realistic(state, user_message)
     reply: str = response_with_sys_user(sys, user)
     
@@ -231,11 +239,7 @@ def initialize() -> ResponseReturnValue:
     required_fields: list[str] = ["playerName", "playerDescription", "worldTheme"]
     
     for field in required_fields:
-        if field not in data:
-            return jsonify({
-                    "sender": str(Sender.ERROR),
-                    "content": f"Missing field: {field}!"
-                }), 400
+        assert(field in data)
 
     camel_case: Callable[[str], str] = lambda s: re.sub(r'(?<!^)(?=[A-Z])', '_', s).lower()
     for field in required_fields:
@@ -261,25 +265,27 @@ def response() -> ResponseReturnValue:
                 "content": "You are dead. Please refresh the browser to play again.",
             }), 200
 
-    data = request.get_json()
-    if "content" not in data:
-        return jsonify({
-                "sender": str(Sender.ERROR),
-                "content": "Missing 'content' in request.",
-            }), 400
+    data: dict[str, Any] = request.get_json()
+    assert("content" in data.keys()) 
 
     user_message = data["content"]
-    if not is_relevant(user_message):
-        return jsonify({
-                "sender": str(Sender.ERROR),
-                "content": "Your message is not relevant to the game story.",
-            }), 400
+    no_override: bool = True
+    if user_message.startswith("@override"):
+        no_override = False
+        user_message: str = user_message.removeprefix("@override")
 
-    if not is_realistic(user_message):
-        return jsonify({
-                "sender": str(Sender.ERROR),
-                "content": "Your message does not respect the realism of the game story.",
-            })
+    if no_override:
+        if not is_relevant(user_message):
+            return jsonify({
+                    "sender": str(Sender.ERROR),
+                    "content": "Your message is not relevant to the game story.",
+                }), 400
+
+        if not is_realistic(user_message):
+            return jsonify({
+                    "sender": str(Sender.ERROR),
+                    "content": "Your message does not respect the realism of the game story.",
+                })
 
     reply: str = get_gamemaster_reply(user_message)
     if len(reply) == 0:
@@ -292,23 +298,23 @@ def response() -> ResponseReturnValue:
     state.hit_points -= dmg
 
     if state.hit_points <= 0:
-        state.game_over = True
-        state.game_over_summary = game_over_summmary()
+        game_over()
+        update_chat_history(user_message, None)
         db.save_game(state)
-
         return jsonify({
                 "sender": str(Sender.SYSTEM),
                 "content": "Oh, no! Unfortunately, you have died!",
                 "gameOverSummary": state.game_over_summary,
                 "hitPoints": state.hit_points,
             }), 200
-
-    db.save_game(state)
-    return jsonify({
-            "sender": str(Sender.GAMEMASTER),
-            "content": reply,
-            "hitPoints": state.hit_points,
-        }), 200
+    else:
+        update_chat_history(user_message, reply)
+        db.save_game(state)
+        return jsonify({
+                "sender": str(Sender.GAMEMASTER),
+                "content": reply,
+                "hitPoints": state.hit_points,
+            }), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=3000)
