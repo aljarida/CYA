@@ -37,6 +37,7 @@ export type SetupFormProps = {
   isFormValid: boolean;
   handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onSubmit: (save: GameSave | null) => Promise<void>;
+  deleteGame: (save: GameSave) => void;
 };
 
 export type SetupModalProps = {
@@ -46,6 +47,7 @@ export type SetupModalProps = {
   isFormValid: boolean;
   handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onSubmit: (save: GameSave | null) => Promise<void>;
+  setIsFormValid: (val: boolean) => void;
 };
 
 export type MessageProps = {

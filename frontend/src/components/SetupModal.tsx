@@ -4,18 +4,38 @@ import type { SetupModalProps, GameSave } from '../misc/types'
 import LoadingState from './LoadingState'
 import SetupForm from './SetupForm'
 
+import postJsonRequest from '../misc/postjsonrequest.ts';
+import { API_DELETE_GAME_URL } from '../misc/enums.ts';
+
 function SetupModal({
   showModal,
   formSubmitted,
   gameInfo,
   isFormValid,
   handleInputChange,
-  onSubmit
+  onSubmit,
+  setIsFormValid,
 }: SetupModalProps) {
-  const [existingGames, setExistingGames] = useState<GameSave[]>([])
-  const [isLoadingSaves, setIsLoadingSaves] = useState(false)
-  const [selectedSave, setSelectedSave] = useState<GameSave | null>(null)
-
+  const [existingGames, setExistingGames] = useState<GameSave[]>([]);
+  const [isLoadingSaves, setIsLoadingSaves] = useState<boolean>(false);
+  const [selectedSave, setSelectedSave] = useState<GameSave | null>(null);
+  
+  useEffect(() => {
+    setIsFormValid(
+      gameInfo.playerName.trim() !== "" && 
+      gameInfo.worldTheme.trim() !== "" &&
+      gameInfo.playerDescription.trim() !== "" &&
+      (existingGames.find(g => (g.playerName === gameInfo.playerName.trim())) === undefined)
+    );
+  }, [gameInfo]);
+  
+  const deleteGame = async (g: GameSave) => {
+    const res = await postJsonRequest(API_DELETE_GAME_URL, { "objectIDString": g.objectIDString })
+    console.assert(res.ok, "Status: ", res.status, "Data: ", res.data)
+    setSelectedSave(null)
+    setExistingGames(prev => prev.filter(game => game.objectIDString != g.objectIDString));
+  };
+  
   useEffect(() => {
     if (!showModal) return
 
@@ -50,6 +70,7 @@ function SetupModal({
             isLoadingSaves={isLoadingSaves}
             selectedSave={selectedSave}
             setSelectedSave={setSelectedSave}
+            deleteGame={deleteGame}
           />
         )}
       </div>

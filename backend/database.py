@@ -29,10 +29,33 @@ class Database():
     def save_game_and_images(self, s: State, images: Images) -> None:
         self.save_game(s)
         self._save_images(images)
-
+    
     def _save_images(self, images: Images) -> None:
         self._fs.put(images.portrait.bytes, filename=images.portrait.filename)
         self._fs.put(images.backdrop.bytes, filename=images.backdrop.filename)
+
+    def delete_game(self, _id: ObjectId) -> None:
+        def _delete_save() -> None:
+            result = self._games.delete_many({ "_id": _id })
+            assert(result.deleted_count == 1)
+
+        _delete_save()
+        self._delete_images(_id)
+
+    def _delete_images(self, _id: ObjectId) -> None:
+        def _image_id_of(filename: str) -> ObjectId:
+            res = self._fs.find_one({ "filename": filename })
+            assert(res is not None)
+            return res._id
+
+        def _delete_img(_image_id: ObjectId) -> None:
+            self._fs.delete(_image_id)
+
+        portrait_filename: str = Images.name_for(_id, ImageType.PORTRAIT)
+        backdrop_filename: str = Images.name_for(_id, ImageType.BACKDROP)
+
+        _delete_img(_image_id_of(portrait_filename))
+        _delete_img(_image_id_of(backdrop_filename))
 
     def get_image_bytes(self, _id: ObjectId) -> tuple[bytes, bytes]:
         """Given a state's unique ID, returns the relevant game images."""

@@ -1,4 +1,5 @@
 // src/components/SetupForm.tsx
+import { useState } from 'react'
 import type { SetupFormProps, GameSave } from '../misc/types'
 import FormField from './FormField'
 import pretty_timestamp from '../misc/pretty_timestamp.ts'
@@ -12,8 +13,21 @@ function SetupForm({
   existingGames,
   isLoadingSaves,
   selectedSave,
-  setSelectedSave
+  setSelectedSave,
+  deleteGame,
 }: SetupFormProps) {
+  const [clickedDelete, setClickedDelete] = useState<boolean>(false);
+  function requestDelete(save: GameSave) {
+    if (clickedDelete) {
+      deleteGame(save);
+    }
+
+    if (!clickedDelete) {
+      setClickedDelete(true);
+      setTimeout(() => setClickedDelete(false), 2000);
+    }
+  }
+
   return (
     <>
       <h2 className="text-2xl font-bold text-neutral-200 mb-6">Adventure Setup</h2>
@@ -42,12 +56,23 @@ function SetupForm({
       ) : null}
 
       {selectedSave ? (
-        <button
-          onClick={() => onSubmit(selectedSave)}
-          className="w-full py-3 mt-4 bg-green-700/60 hover:bg-green-600/60 rounded-lg text-white shadow-md transition-colors"
-        >
-          Continue Adventure
-        </button>
+        <>
+          <button
+            onClick={() => requestDelete(selectedSave)}
+            className={`w-full py-3 mt-4 bg-red-700/60 hover:bg-red-600/60
+              rounded-lg text-white shadow-md transition-colors
+              ${clickedDelete ? 'animate-pulse' : ''}`}
+            style={clickedDelete ? { animationDuration: '0.5s' } : undefined}
+          >
+            {clickedDelete ? "Confirm Deletion" : "Delete Adventure"}
+          </button>
+          <button
+            onClick={() => onSubmit(selectedSave)}
+            className="w-full py-3 mt-4 bg-green-700/60 hover:bg-green-600/60 rounded-lg text-white shadow-md transition-colors"
+          >
+            Continue Adventure
+          </button>
+        </>
       ) : (
         <div className="space-y-5">
           <FormField

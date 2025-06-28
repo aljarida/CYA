@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { API_INITIALIZE_URL, API_LOAD_GAME_URL, } from './misc/enums';
 import postJsonRequest from './misc/postjsonrequest';
 
-import useGameInfo from './handlers/usegameinfo';
 import useChat from './handlers/usechat';
 
 import SetupModal from './components/SetupModal';
@@ -21,8 +20,23 @@ function ChatApp() {
   const [worldBackdropSrc, setWorldBackdropSrc] = useState<string>("");
   const [hitPoints, setHitPoints] = useState<number>(-1);
 
-  const { gameInfo, isFormValid, handleInputChange } = useGameInfo();
   const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter } = useChat();
+  
+  const [gameInfo, setGameInfo] = useState({
+    playerName: "",
+    worldTheme: "",
+    playerDescription: "",
+  });
+
+  const [isFormValid, setIsFormValid] = useState(false);
+
+  const handleInputChange = (e: any) => {
+    const { name, value } = e.target;
+    setGameInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleFormSubmit = async (selectedSave: GameSave | null) => {
     if (!selectedSave && !isFormValid) return;
@@ -101,6 +115,7 @@ function ChatApp() {
         isFormValid={isFormValid}
         handleInputChange={handleInputChange}
         onSubmit={handleFormSubmit}
+        setIsFormValid={setIsFormValid}
       />
 
       <WorldBackdrop src={worldBackdropSrc} />

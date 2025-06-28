@@ -39,9 +39,9 @@ def get_new_images_for(s: State) -> Images:
     db.save_game(s)
     assert(s._id is not None)
 
-    def generate_image_with(prompt: str, fallback_env_var: str, resolution):
+    def generate_image_with(prompt: str, fallback: str, resolution):
         if bool_of_str(os.environ["DEBUG"]):
-            return os.environ[fallback_env_var]
+            return os.environ[fallback]
 
         try:
             result: ImagesResponse = client.images.generate(
@@ -53,7 +53,7 @@ def get_new_images_for(s: State) -> Images:
 
             return empty_str_if_none(result.data[0].url)
         except:
-            return os.environ[fallback_env_var]
+            return os.environ[fallback]
 
     def get_portrait_url() -> str:
         """Obtain debug image portrait URL or generate a new portrait image URL."""
@@ -66,7 +66,7 @@ def get_new_images_for(s: State) -> Images:
     def get_backdrop_url() -> str:
         return generate_image_with(
             prompts.backdrop(state),
-            "PLACEHOLDER_PORTRAIT_URL",
+            "PLACEHOLDER_BACKDROP_URL",
             "1792x1024",
         )
 
@@ -172,6 +172,24 @@ def existing_games() -> ResponseReturnValue:
 
     return jsonify({ "results": results }), 200
 
+@app.route('/api/delete_game', methods=['POST'])
+def delete_game() -> ResponseReturnValue:
+    data: dict[str, Any] = request.get_json()
+    _id_string: str | None = data.get('objectIDString')
+    if _id_string is None:
+        return jsonify({
+                "sender": str(Sender.ERROR),
+                "content": "Can not delete a game without a valid ObjectIdString!",
+            }), 400
+
+    _id: ObjectId = ObjectId(_id_string)
+    db.delete_game(_id)
+    return jsonify({
+            "sender": str(Sender.SYSTEM),
+            "content": "Game successfully deleted.",
+        }), 200
+
+
 @app.route('/api/load_game', methods=['POST'])
 def load_game() -> ResponseReturnValue:
     data: dict[str, Any] = request.get_json()
@@ -179,7 +197,7 @@ def load_game() -> ResponseReturnValue:
     if _id_string is None:
         return jsonify({
                 "sender": str(Sender.ERROR),
-                "content": "Can not load a game without a save ID string!",
+                "content": "Can not load a game without a valid ObjectIdString!",
             }), 400
 
     _id: ObjectId = ObjectId(_id_string)
