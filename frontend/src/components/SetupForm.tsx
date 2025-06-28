@@ -27,10 +27,10 @@ function SetupForm({
 
   return (
     <>
-      <h2 className="text-2xl font-bold text-neutral-200 mb-6">Adventure Setup</h2>
+      <h2 className="text-2xl font-bold text-neutral-200 py-3 mb-3">Adventure Setup</h2>
 
       {isLoadingSaves ? (
-        <p className="text-neutral-400">Loading game saves…</p>
+        <p className="text-neutral-400 py-3 mb-3">Loading game saves…</p>
       ) : existingGames.length > 0 ? (
         <div className="mb-6">
           <label className="block text-neutral-300 mb-2">Load Existing Game</label>
@@ -71,7 +71,7 @@ function SetupForm({
           </button>
         </>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <FormField
             id="playerName"
             name="playerName"

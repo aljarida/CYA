@@ -13,9 +13,9 @@ function FormField({
 }: FormFieldProps) {
   return (
     <div>
-        <label htmlFor={id} className="block text-neutral-300 mb-1">
-        {label}
-        {required && <span className="text-red-400">*</span>}
+        <label htmlFor={id} className="block text-neutral-300 mb-1.5">
+		  {label}
+	      {required && <span className="text-red-400"> *</span>}
         </label>
         {isTextarea ? (
         <textarea

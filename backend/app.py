@@ -2,13 +2,14 @@ from flask import Flask, request, jsonify
 from flask.typing import ResponseReturnValue
 from flask_cors import CORS
 
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 from openai.types import ImagesResponse
 from openai.types.chat import ChatCompletion
 
 from dotenv import load_dotenv
 from typing import Any, Callable
 import os
+import asyncio
 import re
 
 from bson.objectid import ObjectId
@@ -24,6 +25,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 load_dotenv()
 client: OpenAI = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+async_client: AsyncOpenAI = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 state: State = State()
 
@@ -32,19 +34,18 @@ db: Database = Database()
 def empty_str_if_none(reply: str | None) -> str:
     return reply if reply is not None else ""
 
-def get_new_images_for(s: State) -> Images:
+async def get_new_images_for(s: State) -> Images:
     """Obtain portrait and backdrop images given that a provided State object with a valid _id."""
-
     assert(s._id is None)
     db.save_game(s)
     assert(s._id is not None)
 
-    def generate_image_with(prompt: str, fallback: str, resolution):
+    async def generate_image_with(prompt: str, fallback: str, resolution):
         if bool_of_str(os.environ["DEBUG"]):
             return os.environ[fallback]
 
         try:
-            result: ImagesResponse = client.images.generate(
+            result: ImagesResponse = await async_client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
                 size=resolution,
@@ -55,24 +56,26 @@ def get_new_images_for(s: State) -> Images:
         except:
             return os.environ[fallback]
 
-    def get_portrait_url() -> str:
+    async def get_portrait_url() -> str:
         """Obtain debug image portrait URL or generate a new portrait image URL."""
-        return generate_image_with(
+        return await generate_image_with(
             prompts.portrait(state),
             "PLACEHOLDER_PORTRAIT_URL",
             "1024x1024"
         )
         
-    def get_backdrop_url() -> str:
-        return generate_image_with(
+    async def get_backdrop_url() -> str:
+        return await generate_image_with(
             prompts.backdrop(state),
             "PLACEHOLDER_BACKDROP_URL",
             "1792x1024",
         )
 
 
-    portrait_url: str = get_portrait_url()
-    backdrop_url: str = get_backdrop_url()
+    portrait_url, backdrop_url = await asyncio.gather(
+        get_portrait_url(),
+        get_backdrop_url()
+    )
 
     return Images(
         s._id,
@@ -246,7 +249,7 @@ def initialize() -> ResponseReturnValue:
         setattr(state, camel_case(field), data[field])
 
     setup_initialization_prompt()
-    images: Images = get_new_images_for(state)
+    images: Images = asyncio.run(get_new_images_for(state))
 
     db.save_game_and_images(state, images)
     return jsonify({
