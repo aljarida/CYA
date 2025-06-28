@@ -14,19 +14,16 @@ import re
 from bson.objectid import ObjectId
 
 import prompts
-from classes import MAX_HIT_POINTS, State, Sender, Images, Image
+from classes import MAX_HIT_POINTS, State, Sender
+from images import Image, Images
 from database import Database
-
-PLACEHOLDER_PORTRAIT_URL = "https://upload.wikimedia.org/wikipedia/commons/4/4b/Josef_Bergenthal_oil_painting_portrait.jpg"
-PLACEHOLDER_BACKDROP_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/%28Venice%29_Rape_of_Europa_by_Francesco_Zuccarelli_-_Gallerie_Accademia.jpg/1024px-%28Venice%29_Rape_of_Europa_by_Francesco_Zuccarelli_-_Gallerie_Accademia.jpg"
-
-DEBUG_MODE: bool = False
+from utils import bool_of_str
 
 app: Flask = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 load_dotenv()
-client: OpenAI = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client: OpenAI = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 state: State = State()
 
@@ -37,54 +34,50 @@ def empty_str_if_none(reply: str | None) -> str:
 
 def get_new_images_for(s: State) -> Images:
     """Obtain portrait and backdrop images given that a provided State object with a valid _id."""
+
     assert(s._id is None)
+    db.save_game(s)
+    assert(s._id is not None)
 
-    def get_portrait_url() -> str:
-        """Obtain debug image portrait URL or generate a new portrait image URL."""
-        if DEBUG_MODE:
-            return PLACEHOLDER_PORTRAIT_URL
+    def generate_image_with(prompt: str, fallback_env_var: str, resolution):
+        if bool_of_str(os.environ["DEBUG"]):
+            return os.environ[fallback_env_var]
 
-        prompt: str = prompts.portrait(state)
         try:
             result: ImagesResponse = client.images.generate(
                 model="dall-e-3",
                 prompt=prompt,
-                size="1024x1024",
+                size=resolution,
                 n=1
             )
 
             return empty_str_if_none(result.data[0].url)
         except:
-            return PLACEHOLDER_PORTRAIT_URL
+            return os.environ[fallback_env_var]
+
+    def get_portrait_url() -> str:
+        """Obtain debug image portrait URL or generate a new portrait image URL."""
+        return generate_image_with(
+            prompts.portrait(state),
+            "PLACEHOLDER_PORTRAIT_URL",
+            "1024x1024"
+        )
         
-    def get_landscape_url() -> str:
-        """Obtain debug image landscape URL or generate a new landscape image URL."""
-        if DEBUG_MODE:
-            return PLACEHOLDER_BACKDROP_URL
+    def get_backdrop_url() -> str:
+        return generate_image_with(
+            prompts.backdrop(state),
+            "PLACEHOLDER_PORTRAIT_URL",
+            "1792x1024",
+        )
 
-        prompt: str = prompts.backdrop(state)
-        try:
-            result: ImagesResponse = client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size="1792x1024",
-                n=1
-            )
-
-            return empty_str_if_none(result.data[0].url)
-        except Exception as e:
-            return str(e)
-
-    db.save_game(s)
-    assert(s._id is not None)
 
     portrait_url: str = get_portrait_url()
-    landscape_url: str = get_landscape_url()
+    backdrop_url: str = get_backdrop_url()
 
     return Images(
         s._id,
         Image.bytes_from_url(portrait_url),
-        Image.bytes_from_url(landscape_url),
+        Image.bytes_from_url(backdrop_url),
     )
 
 def response_with_sys_user(sys_content: str, user_content: str) -> str:
@@ -124,6 +117,16 @@ def get_gamemaster_reply(user_message: str) -> str:
 
 def is_relevant(user_message: str):
     sys, user  = prompts.relevant(state, user_message)
+    reply: str = response_with_sys_user(sys, user)
+    
+    match reply.strip().lower():
+        case 'true' | "'true'" | '"true"':
+            return True
+        case _:
+            return False
+
+def is_realistic(user_message: str):
+    sys, user  = prompts.realistic(state, user_message)
     reply: str = response_with_sys_user(sys, user)
     
     match reply.strip().lower():
@@ -190,18 +193,20 @@ def load_game() -> ResponseReturnValue:
     for key in save_data.keys():
         setattr(state, key, save_data[key])
     
-    portrait_bytes, landscape_bytes = db.get_image_bytes(_id)
+    portrait_bytes, backdrop_bytes = db.get_image_bytes(_id)
     return jsonify({
             "sender": str(Sender.SYSTEM),
             "content": "Game state successfully loaded.",
-            "portraitUrl": Image.json_content_from_bytes(portrait_bytes),
-            "worldBackdropUrl": Image.json_content_from_bytes(landscape_bytes),
+            "portraitSrc": Image.json_content_from_bytes(portrait_bytes),
+            "worldBackdropSrc": Image.json_content_from_bytes(backdrop_bytes),
             "hitPoints": state.hit_points,
         }), 200
 
 @app.route('/api/initialize', methods=['POST'])
 def initialize() -> ResponseReturnValue:
-    global state # NOTE: Temporary while in development.
+    # NOTE: Temporary while in development.
+    # NOTE: This cannot be used for multiple users.
+    global state
     state = State()
 
     data: dict[str, Any] = request.get_json()
@@ -222,12 +227,11 @@ def initialize() -> ResponseReturnValue:
     images: Images = get_new_images_for(state)
 
     db.save_game_and_images(state, images)
-    # TODO: Rename ...Url to be ...Src because these can be URLs or bytes.
     return jsonify({
         "sender": str(Sender.SYSTEM),
         "systemPrompt": state.initialization_prompt,
-        "portraitUrl": images.portrait.json_content(),
-        "worldBackdropUrl": images.landscape.json_content(),
+        "portraitSrc": images.portrait.json_content(),
+        "worldBackdropSrc": images.backdrop.json_content(),
         "hitPoints": MAX_HIT_POINTS,
     }), 200
 
@@ -243,21 +247,27 @@ def response() -> ResponseReturnValue:
     if "content" not in data:
         return jsonify({
                 "sender": str(Sender.ERROR),
-                "content": "Missing 'content' in request."
+                "content": "Missing 'content' in request.",
             }), 400
 
     user_message = data["content"]
     if not is_relevant(user_message):
         return jsonify({
                 "sender": str(Sender.ERROR),
-                "content": "Your message is not relevant to the game story."
+                "content": "Your message is not relevant to the game story.",
             }), 400
+
+    if not is_realistic(user_message):
+        return jsonify({
+                "sender": str(Sender.ERROR),
+                "content": "Your message does not respect the realism of the game story.",
+            })
 
     reply: str = get_gamemaster_reply(user_message)
     if len(reply) == 0:
         return jsonify({
                 "sender": str(Sender.ERROR),
-                "content": "Gamemaster failed to generate a response."
+                "content": "Gamemaster failed to generate a response.",
             }), 500
 
     dmg: int = assess_damage(user_message, reply)
@@ -279,7 +289,7 @@ def response() -> ResponseReturnValue:
     return jsonify({
             "sender": str(Sender.GAMEMASTER),
             "content": reply,
-            "hitPoints": state.hit_points
+            "hitPoints": state.hit_points,
         }), 200
 
 if __name__ == '__main__':

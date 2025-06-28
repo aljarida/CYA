@@ -17,12 +17,12 @@ import type { ChatHistoryMessage, GameSave, LoadMessage } from './misc/types';
 function ChatApp() {
   const [showModal, setShowModal] = useState(true);
   const [formSubmitted, setFormSubmitted] = useState(false);
-  const [portraitUrl, setPortraitUrl] = useState<string>("");
-  const [worldBackdropUrl, setWorldBackdropUrl] = useState<string>("");
+  const [portraitSrc, setPortraitSrc] = useState<string>("");
+  const [worldBackdropSrc, setWorldBackdropSrc] = useState<string>("");
   const [hitPoints, setHitPoints] = useState<number>(-1);
 
   const { gameInfo, isFormValid, handleInputChange } = useGameInfo();
-  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo } = useChat();
+  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter } = useChat();
 
   const handleFormSubmit = async (selectedSave: GameSave | null) => {
     if (!selectedSave && !isFormValid) return;
@@ -66,8 +66,8 @@ function ChatApp() {
     }
 
     setHitPoints(data.maxHitPoints);
-    setPortraitUrl(data.portraitUrl);
-    setWorldBackdropUrl(data.worldBackdropUrl)
+    setPortraitSrc(data.portraitSrc);
+    setWorldBackdropSrc(data.worldBackdropSrc)
     setShowModal(false);
   };
 
@@ -87,7 +87,7 @@ function ChatApp() {
         setInput(getInputPriorTo(input));
         break;
       case 'ArrowDown':
-        setInput("");
+        setInput(getInputAfter(input));
         break;
     }
   }
@@ -103,8 +103,8 @@ function ChatApp() {
         onSubmit={handleFormSubmit}
       />
 
-      <WorldBackdrop url={worldBackdropUrl} />
-      <Portrait url={portraitUrl} />
+      <WorldBackdrop src={worldBackdropSrc} />
+      <Portrait src={portraitSrc} />
       <HitPoints hitPoints={hitPoints} />
 
       <ChatMessages messages={messages} />

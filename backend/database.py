@@ -1,5 +1,4 @@
 from typing import Any
-from dotenv import load_dotenv
 from datetime import datetime
 import os
 
@@ -7,19 +6,16 @@ import gridfs
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
-from classes import State, Images, ImageType
-
-CLUSTER: str = "cya"
-COLLECTION: str = "games"
+from classes import State
+from images import Images, ImageType
 
 class Database():
     def __init__(self):
-        load_dotenv()
-        key: str | None = os.getenv("MONGODB_CONNECTION_STRING")
+        key: str = os.environ["MONGODB_CONNECTION_STRING"]
         assert(key is not None)
         self._client: MongoClient = MongoClient(key)
-        self._database  = self._client.get_database(CLUSTER)
-        self._games = self._database.get_collection(COLLECTION)
+        self._database  = self._client.get_database(os.environ["CLUSTER"])
+        self._games = self._database.get_collection(os.environ["COLLECTION"])
         self._fs = gridfs.GridFS(self._database)
 
     def save_game(self, s: State) -> None:
@@ -36,13 +32,13 @@ class Database():
 
     def _save_images(self, images: Images) -> None:
         self._fs.put(images.portrait.bytes, filename=images.portrait.filename)
-        self._fs.put(images.landscape.bytes, filename=images.landscape.filename)
+        self._fs.put(images.backdrop.bytes, filename=images.backdrop.filename)
 
     def get_image_bytes(self, _id: ObjectId) -> tuple[bytes, bytes]:
         """Given a state's unique ID, returns the relevant game images."""
         image_filepaths: list[str] = [
             Images.name_for(_id, ImageType.PORTRAIT),
-            Images.name_for(_id, ImageType.LANDSCAPE),
+            Images.name_for(_id, ImageType.BACKDROP),
         ]
 
         def _get_bytes(filename: str) -> bytes:
@@ -50,10 +46,10 @@ class Database():
             assert(file is not None)
             return file.read()
 
-        return (
-            _get_bytes(image_filepaths[0]),
-            _get_bytes(image_filepaths[1]),
-        )
+        portrait: bytes  = _get_bytes(image_filepaths[0])
+        backdrop: bytes = _get_bytes(image_filepaths[1])
+
+        return portrait, backdrop
 
     def all_games(self) -> list[State]:
         games = self._games.find({})

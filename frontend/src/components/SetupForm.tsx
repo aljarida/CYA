@@ -1,6 +1,7 @@
 // src/components/SetupForm.tsx
 import type { SetupFormProps, GameSave } from '../misc/types'
 import FormField from './FormField'
+import pretty_timestamp from '../misc/pretty_timestamp.ts'
 
 
 function SetupForm({
@@ -33,7 +34,7 @@ function SetupForm({
             <option value="">Start New Adventure</option>
             {existingGames.map((g: GameSave) => (
               <option key={g.objectIDString} value={g.objectIDString}>
-                {g.playerName} — {g.worldTheme}
+                {g.playerName} - {pretty_timestamp(g.updatedAt)}
               </option>
             ))}
           </select>

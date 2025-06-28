@@ -13,7 +13,7 @@ const useGameInfo = () => {
     setIsFormValid(
       gameInfo.playerName.trim() !== "" && 
       gameInfo.worldTheme.trim() !== "" &&
-	  gameInfo.playerDescription.trim() !== ""
+	    gameInfo.playerDescription.trim() !== ""
     );
   }, [gameInfo]);
 

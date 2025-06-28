@@ -9,8 +9,8 @@ const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
 
-  const addMessage = ({ sender, content }: Message) => {
-    setMessages(prev => [...prev, { sender, content }]);
+  const addMessage = (message: Message) => {
+    setMessages(prev => [...prev, message]);
   };
 
   const sendMessage = async (): Promise<MessageResponse | null> => {
@@ -60,7 +60,30 @@ const useChat = () => {
 
     return "";
   }
+  
+  const getInputAfter = (givenMsg: string) => {
+    const noGivenMsg: boolean = givenMsg === "";
+    let usrMsgFound: boolean = false;
 
+    let i = 0;
+    for (; i < messages.length; i++) {
+      usrMsgFound = (messages[i].sender === 'user');
+      if (usrMsgFound && noGivenMsg) {
+        return messages[i].content;
+      } else if (usrMsgFound && messages[i].content === input) {
+        break;
+      }
+    }
+
+    if (usrMsgFound) {
+      for (let j = i + 1; j < messages.length; j++) {
+        const nextUsrMsg: boolean = messages[j].sender === 'user';
+        if (nextUsrMsg) return messages[j].content;
+      }
+    }
+
+	return "";
+  }
 
   return {
     messages,
@@ -69,6 +92,7 @@ const useChat = () => {
     sendMessage,
     addMessage,
     getInputPriorTo,
+	getInputAfter,
   };
 };
 

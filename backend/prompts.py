@@ -106,7 +106,7 @@ Latest user message:
 
 === End of game context ===
 
-Is this user message relevant to the game context and story? Answer only 'true' or 'false'.
+Is this latest user message relevant to the game context and story? Answer only 'true' or 'false'.
 """
 
 def relevant(state: State, user_message: str) -> tuple[str, str]:
@@ -117,6 +117,45 @@ def relevant(state: State, user_message: str) -> tuple[str, str]:
     )
 
     return (RELEVANT_PROMPT_SYS, prompt_user)
+
+
+
+
+REALISTIC_PROMPT_SYS = """
+You are an assistant that only answers 'true' or 'false'. Your job is to determine whether a message is realistic given the game context. You should strongly press for realism.
+
+A realistic message aligns with the physical, logical, and narrative constraints of the game. 
+It should not involve exaggerated, superhuman, or impossible feats unless such powers have been clearly established in the game story.
+
+For example, if the user is in prison, and says, "I inhale as deep as I can, then suddenly exhale greatly, bringing the whole prison down to free myself!", unless the player has established magical abilities, you would certainly respond with 'false'.
+"""
+
+REALISTIC_PROMPT_USER = """
+Determine if the following user message is realistic within the current game world. 
+
+=== Game context ===
+Initial world configuration:
+"{initialization_prompt}"
+
+Game story thus far:
+"{game_story}"
+
+Latest user message:
+"{user_message}"
+
+=== End of game context ===
+
+Is this latest user message realistic given the game context and world rules? Answer only 'true' or 'false'.
+"""
+
+def realistic(state: State, user_message: str) -> tuple[str, str]:
+    prompt_user: str = REALISTIC_PROMPT_USER.format(
+        initialization_prompt=state.initialization_prompt,
+        game_story=state.chat_history[1:],
+        user_message=user_message,
+    )
+
+    return (REALISTIC_PROMPT_SYS, prompt_user)
 
 
 

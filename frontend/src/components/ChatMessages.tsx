@@ -12,7 +12,7 @@ function ChatMessages({ messages }: ChatMessagesProps) {
   }, [messages])
   
   return (
-    <div className="relative flex flex-col flex-grow">
+    <div className="relative flex flex-col flex-grow overflow-hidden">
       <button
         onClick={() => setIsFaded(!isFaded)}
         className="absolute top-4 right-16 z-10 p-2 rounded-full bg-black/20 hover:bg-black/40 transition-colors duration-200 backdrop-blur-sm"
