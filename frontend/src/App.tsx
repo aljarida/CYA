@@ -11,6 +11,8 @@ import ChatInput from './components/ChatInput';
 import Portrait from './components/Portrait';
 import HitPoints from './components/HitPoints';
 import WorldBackdrop from './components/WorldBackdrop';
+import BackButton from './components/BackButton';
+
 import type { ChatHistoryMessage, GameSave, LoadMessage } from './misc/types';
 
 function ChatApp() {
@@ -20,7 +22,7 @@ function ChatApp() {
   const [worldBackdropSrc, setWorldBackdropSrc] = useState<string>("");
   const [hitPoints, setHitPoints] = useState<number>(-1);
 
-  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter } = useChat();
+  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter, clearMessages } = useChat();
   
   const [gameInfo, setGameInfo] = useState({
     playerName: "",
@@ -117,6 +119,18 @@ function ChatApp() {
     }
   }
 
+  const unloadGame = () => {
+     // 1. Remove chats 
+    clearMessages();
+     // 2. Remove portrait
+     setPortraitSrc("");
+     // 3. Remove backdrop
+     setWorldBackdropSrc("");
+     // 4. Show modal 
+     setFormSubmitted(false); 
+     setShowModal(true);
+  }
+
   return (
     <div className="relative flex flex-col h-screen bg-gradient-to-br from-neutral-800 via-gray-700 to-neutral-600 p-8 pr-16">
       <SetupModal
@@ -140,6 +154,7 @@ function ChatApp() {
         onSend={handleSendMessage}
         onKeyPress={handleKeyPress}
       />
+      <BackButton unloadGame={unloadGame} />
     </div>
   );
 }

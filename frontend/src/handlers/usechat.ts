@@ -12,6 +12,10 @@ const useChat = () => {
   const addMessage = (message: Message) => {
     setMessages(prev => [...prev, message]);
   };
+  
+  const clearMessages = () => {
+    setMessages([]);
+  }
 
   const sendMessage = async (): Promise<MessageResponse | null> => {
     if (!input.trim()) return null;
@@ -93,6 +97,7 @@ const useChat = () => {
     addMessage,
     getInputPriorTo,
 	  getInputAfter,
+    clearMessages,
   };
 };
 

@@ -92,3 +92,7 @@ export type GameSave = {
   objectIDString: string
   chatHistory: any[]
 }
+
+export type BackButtonProps = {
+  unloadGame: () => void;
+}
