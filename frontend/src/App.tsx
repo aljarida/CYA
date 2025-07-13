@@ -24,11 +24,14 @@ function ChatApp() {
 
   const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter, clearMessages } = useChat();
   
-  const [gameInfo, setGameInfo] = useState({
+
+  const emptyGameInfo = {
     playerName: "",
     worldTheme: "",
     playerDescription: "",
-  });
+  }
+
+  const [gameInfo, setGameInfo] = useState(emptyGameInfo);
 
   const [isFormValid, setIsFormValid] = useState(false);
 
@@ -90,6 +93,7 @@ function ChatApp() {
     setPortraitSrc(data.portraitSrc);
     setWorldBackdropSrc(data.worldBackdropSrc)
     setShowModal(false);
+    setGameInfo(emptyGameInfo)
   };
 
   const handleSendMessage = async () => {
