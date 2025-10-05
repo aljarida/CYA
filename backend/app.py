@@ -54,7 +54,8 @@ async def get_new_images_for(s: State) -> Images:
 
             return empty_str_if_none(result.data[0].url)
         except:
-            return os.environ[fallback]
+            raise Exception("The image request failed for some reason!")
+            # return os.environ[fallback]
 
     async def get_portrait_url() -> str:
         """Obtain debug image portrait URL or generate a new portrait image URL."""
@@ -307,6 +308,7 @@ def response() -> ResponseReturnValue:
                 content = "Your message is not relevant to the game story."
             else:
                 content = "Your message does not respect the realism of the game story."
+
             return jsonify({
                     "sender": str(Sender.ERROR),
                     "content": content,

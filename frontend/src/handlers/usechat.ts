@@ -27,6 +27,8 @@ const useChat = () => {
     const result = await postJsonRequest(API_RESPONSE_URL, {
       content: userMessage,
     });
+
+	console.log(result);
     const data: MessageResponse = result.data
 
     if (result.ok) {

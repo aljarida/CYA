@@ -124,15 +124,11 @@ function ChatApp() {
   }
 
   const unloadGame = () => {
-     // 1. Remove chats 
     clearMessages();
-     // 2. Remove portrait
-     setPortraitSrc("");
-     // 3. Remove backdrop
-     setWorldBackdropSrc("");
-     // 4. Show modal 
-     setFormSubmitted(false); 
-     setShowModal(true);
+    setPortraitSrc("");
+    setWorldBackdropSrc("");
+    setFormSubmitted(false); 
+    setShowModal(true);
   }
 
   return (
