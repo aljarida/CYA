@@ -96,18 +96,6 @@ def response_with_sys_user(sys_content: str, user_content: str) -> str:
     reply: str = empty_str_if_none(response.choices[0].message.content)
     return reply
 
-async def async_response_with_sys_user(sys_content: str, user_content: str) -> str:
-    response: ChatCompletion = await async_client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[
-            {"role": "system", "content": sys_content},
-            {"role": "user", "content": user_content},
-        ],
-        temperature=0,
-    )
-    reply: str = empty_str_if_none(response.choices[0].message.content)
-    return reply
-
 def setup_initialization_prompt() -> None:
     prompt: str = prompts.initialization(state)
 
@@ -139,9 +127,9 @@ def get_gamemaster_reply(user_message: str) -> str:
     state.chat_history.pop() # Pop to keep state unaffected by function call.
     return reply
 
-async def is_relevant(user_message: str) -> bool:
+def is_relevant(user_message: str) -> bool:
     sys, user  = prompts.relevant(state, user_message)
-    reply: str = await async_response_with_sys_user(sys, user)
+    reply: str = response_with_sys_user(sys, user)
     
     match reply.strip().lower():
         case 'true' | "'true'" | '"true"':
@@ -149,23 +137,15 @@ async def is_relevant(user_message: str) -> bool:
         case _:
             return False
 
-async def is_realistic(user_message: str) -> bool:
+def is_realistic(user_message: str) -> bool:
     sys, user  = prompts.realistic(state, user_message)
-    reply: str = await async_response_with_sys_user(sys, user)
+    reply: str = response_with_sys_user(sys, user)
     
     match reply.strip().lower():
         case 'true' | "'true'" | '"true"':
             return True
         case _:
             return False
-
-async def is_relevant_or_realistic(user_message: str) -> tuple[bool, bool]:
-    relevant, realistic = await asyncio.gather(
-        is_relevant(user_message),
-        is_realistic(user_message),
-    )
-    return relevant, realistic
-    
 
 def assess_damage(user_message: str, gamemaster_reply: str) -> int:
     sys, user = prompts.damaging(state, user_message, gamemaster_reply)
@@ -299,7 +279,8 @@ def response() -> ResponseReturnValue:
         user_message: str = user_message.removeprefix("@override")
 
     if no_override:
-        relevant, realistic = asyncio.run(is_relevant_or_realistic(user_message))
+        relevant = is_relevant(user_message)
+        realistic = is_realistic(user_message)
         if not relevant or not realistic:
             content: str = ""
             if not relevant and not realistic:
