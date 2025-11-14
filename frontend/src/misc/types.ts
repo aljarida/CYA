@@ -53,6 +53,8 @@ export type SetupModalProps = {
 export type MessageProps = {
   message: Message;
   index: number;
+  gameId: string | null;
+  onSuggestionClick: (suggestion: string) => void;
 };
 
 export type Message = {
@@ -72,6 +74,8 @@ export type ChatHistoryMessage = {
 
 export type ChatMessagesProps = {
   messages: Message[];
+  gameId: string | null;
+  onSuggestionClick: (suggestion: string) => void;
 };
 
 export type ChatInputProps = {

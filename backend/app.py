@@ -12,6 +12,7 @@ from typing import Any, Callable
 import os
 import asyncio
 import re
+import random
 
 from bson.objectid import ObjectId
 
@@ -141,6 +142,19 @@ async def async_response_with_sys_user(sys_content: str, user_content: str) -> s
     reply: str = empty_str_if_none(response.choices[0].message.content)
     return reply
 
+async def async_response_with_sys_user_temperature(sys_content: str, user_content: str, temperature: float = 0.7) -> str:
+    """Generate a response with configurable temperature for randomness."""
+    response = await async_client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[
+            {"role": "system", "content": sys_content},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=temperature,
+    )
+    reply: str = empty_str_if_none(response.choices[0].message.content)
+    return reply
+
 def setup_initialization_prompt(state: State) -> None:
     prompt: str = prompts.initialization(state)
 
@@ -208,6 +222,45 @@ def assess_damage(state: State, user_message: str, gamemaster_reply: str) -> int
 def game_over_summmary(state: State) -> str:
     sys, user = prompts.game_over_summmary(state)
     return response_with_sys_user(sys, user)    
+
+@app.get('/api/get_suggested_responses')
+async def get_suggested_responses(gameId: str, n: int = 3) -> dict[str, Any]:
+    """Generate N suggested player responses based on the most recent AI response."""
+    state = load_state_from_db(gameId)
+    if state is None:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "sender": str(Sender.ERROR),
+                "content": "Invalid game ID.",
+            }
+        )
+    
+    gamemaster_reply: str | None = state.chat_history[-1].get("content", None)
+    
+    if gamemaster_reply is None or len(gamemaster_reply) == 0:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "sender": str(Sender.ERROR),
+                "content": "No gamemaster response found. Please send a message first.",
+            }
+        )
+    
+    # Generate N suggested responses in parallel with randomness
+    sys_prompt, user_prompt = prompts.suggested_response(state, gamemaster_reply)
+    
+    async def generate_suggestion() -> str:
+        # Vary temperature slightly (0.7-0.9) for each request to ensure diversity
+        temperature = random.uniform(0.7, 0.9)
+        return await async_response_with_sys_user_temperature(sys_prompt, user_prompt, temperature=temperature)
+    
+    tasks = [generate_suggestion() for _ in range(n)]
+    suggestions: list[str] = await asyncio.gather(*tasks)
+    
+    return {
+        "suggestions": suggestions
+    }
 
 @app.get('/api/existing_games')
 def existing_games() -> dict[str, Any]:
@@ -336,7 +389,6 @@ async def validate_and_get_gamemaster_reply(state: State, user_message: str) -> 
 
 @app.post('/api/response')
 async def response(data: ResponseRequest) -> dict[str, Any]:
-    # Load state from database using game ID
     if data.gameId is None:
         return JSONResponse(
             status_code=400,

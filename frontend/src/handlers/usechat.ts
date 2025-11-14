@@ -17,16 +17,18 @@ const useChat = (gameId: string | null) => {
     setMessages([]);
   }
 
-  const sendMessage = async (): Promise<MessageResponse | null> => {
-    if (!input.trim()) return null;
+  const sendMessage = async (messageOverride?: string): Promise<MessageResponse | null> => {
+    const userMessage = messageOverride || input;
+    if (!userMessage.trim()) return null;
     if (!gameId) {
       console.error("Cannot send message: gameId is not set");
       return null;
     }
 
-    const userMessage = input;
     addMessage({ sender: 'user', content: userMessage });
-    setInput("");
+    if (!messageOverride) {
+      setInput("");
+    }
 
     const result = await postJsonRequest(API_RESPONSE_URL, {
       content: userMessage,

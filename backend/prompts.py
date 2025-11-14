@@ -245,3 +245,47 @@ def game_over_summmary(
     )
     
     return (GAME_OVER_SUMMARY_PROMPT_SYS, prompt_user)
+
+
+
+
+SUGGESTED_RESPONSES_PROMPT_SYS = """
+You are an assistant that generates suggested player responses for a text-based adventure game.
+
+Your job is to generate a single, short, natural player response that a player might say in response to the gamemaster's most recent message.
+
+The response should:
+- Be brief (one sentence or short phrase)
+- Be natural and conversational
+- Fit the game context and story
+- Be something a player character would realistically say or do
+- Not break character or reference the game mechanics
+
+Respond with only the suggested player response, nothing else.
+"""
+
+SUGGESTED_RESPONSES_PROMPT_USER = """
+Generate a suggested player response for the following game situation.
+
+=== Game context ===
+Initial world configuration:
+"{initialization_prompt}"
+
+Game story thus far:
+"{game_story}"
+
+Most recent gamemaster message:
+"{gamemaster_reply}"
+=== End of game context ===
+
+Generate a single, brief, natural player response that fits this context.
+"""
+
+def suggested_response(state: State, gamemaster_reply: str) -> tuple[str, str]:
+    prompt_user: str = SUGGESTED_RESPONSES_PROMPT_USER.format(
+        initialization_prompt=state.initialization_prompt,
+        game_story=state.chat_history[1:-1] if len(state.chat_history) >= 3 else "[No other context.]",
+        gamemaster_reply=gamemaster_reply,
+    )
+    
+    return (SUGGESTED_RESPONSES_PROMPT_SYS, prompt_user)

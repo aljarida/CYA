@@ -158,7 +158,18 @@ function ChatApp() {
       <Portrait src={portraitSrc} />
       <HitPoints hitPoints={hitPoints} />
 
-      <ChatMessages messages={messages} />
+      <ChatMessages messages={messages} gameId={gameId} onSuggestionClick={async (suggestion: string) => {
+        const data = await sendMessage(suggestion);
+        if (data && data.hasOwnProperty('hitPoints') && typeof data.hitPoints == 'number') {
+          const lostHitpoints: number = hitPoints - data.hitPoints;
+          if (lostHitpoints) {
+            setHitPoints(data.hitPoints);
+            if (data.hitPoints > 0) {
+              addMessage({ "sender": "system", "content": `You lost ${lostHitpoints} health!` })
+            }
+          }
+        }
+      }} />
       <ChatInput
         input={input}
         setInput={setInput}
