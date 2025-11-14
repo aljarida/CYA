@@ -77,7 +77,6 @@ async def get_new_images_for(s: State) -> Images:
             return empty_str_if_none(result.data[0].url)
         except:
             raise Exception("The image request failed for some reason!")
-            # return os.environ[fallback]
 
     async def get_portrait_url() -> str:
         """Obtain debug image portrait URL or generate a new portrait image URL."""
@@ -93,7 +92,6 @@ async def get_new_images_for(s: State) -> Images:
             "PLACEHOLDER_BACKDROP_URL",
             "1792x1024",
         )
-
 
     portrait_url, backdrop_url = await asyncio.gather(
         get_portrait_url(),
