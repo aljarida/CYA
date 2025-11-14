@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify
-from flask.typing import ResponseReturnValue
-from flask_cors import CORS
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from openai import AsyncOpenAI, OpenAI
 from openai.types import ImagesResponse
@@ -20,8 +21,29 @@ from images import Image, Images
 from database import Database
 from utils import bool_of_str
 
-app: Flask = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+app: FastAPI = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class DeleteGameRequest(BaseModel):
+    objectIDString: str | None = None
+
+class LoadGameRequest(BaseModel):
+    objectIDString: str | None = None
+
+class InitializeRequest(BaseModel):
+    playerName: str
+    playerDescription: str
+    worldTheme: str
+
+class ResponseRequest(BaseModel):
+    content: str
 
 load_dotenv()
 client: OpenAI = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -96,6 +118,18 @@ def response_with_sys_user(sys_content: str, user_content: str) -> str:
     reply: str = empty_str_if_none(response.choices[0].message.content)
     return reply
 
+async def async_response_with_sys_user(sys_content: str, user_content: str) -> str:
+    response = await async_client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[
+            {"role": "system", "content": sys_content},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0,
+    )
+    reply: str = empty_str_if_none(response.choices[0].message.content)
+    return reply
+
 def setup_initialization_prompt() -> None:
     prompt: str = prompts.initialization(state)
 
@@ -114,10 +148,10 @@ def update_chat_history(user_message: str, gamemaster_reply: str | None) -> None
     if gamemaster_reply is not None:
         state.chat_history.append({"role": "assistant", "content": gamemaster_reply})
 
-def get_gamemaster_reply(user_message: str) -> str:
+async def async_get_gamemaster_reply(user_message: str) -> str:
     state.chat_history.append({"role": "user", "content": user_message}) # Temporarily append.
     
-    response = client.chat.completions.create(
+    response = await async_client.chat.completions.create(
         model="gpt-4.1",
         messages=state.chat_history
     )
@@ -127,9 +161,9 @@ def get_gamemaster_reply(user_message: str) -> str:
     state.chat_history.pop() # Pop to keep state unaffected by function call.
     return reply
 
-def is_relevant(user_message: str) -> bool:
+async def async_is_relevant(user_message: str) -> bool:
     sys, user  = prompts.relevant(state, user_message)
-    reply: str = response_with_sys_user(sys, user)
+    reply: str = await async_response_with_sys_user(sys, user)
     
     match reply.strip().lower():
         case 'true' | "'true'" | '"true"':
@@ -137,9 +171,9 @@ def is_relevant(user_message: str) -> bool:
         case _:
             return False
 
-def is_realistic(user_message: str) -> bool:
+async def async_is_realistic(user_message: str) -> bool:
     sys, user  = prompts.realistic(state, user_message)
-    reply: str = response_with_sys_user(sys, user)
+    reply: str = await async_response_with_sys_user(sys, user)
     
     match reply.strip().lower():
         case 'true' | "'true'" | '"true"':
@@ -164,8 +198,8 @@ def game_over_summmary() -> str:
     sys, user = prompts.game_over_summmary(state)
     return response_with_sys_user(sys, user)    
 
-@app.route('/api/existing_games', methods=['GET'])
-def existing_games() -> ResponseReturnValue:
+@app.get('/api/existing_games')
+def existing_games() -> dict[str, Any]:
     saves: list[State] = db.all_games()
     results: list[dict[str, Any]] = []
     for s in saves:
@@ -182,125 +216,152 @@ def existing_games() -> ResponseReturnValue:
 
         })
 
-    return jsonify({ "results": results }), 200
+    return { "results": results }
 
-@app.route('/api/delete_game', methods=['POST'])
-def delete_game() -> ResponseReturnValue:
-    data: dict[str, Any] = request.get_json()
-    _id_string: str | None = data.get('objectIDString')
+@app.post('/api/delete_game')
+def delete_game(data: DeleteGameRequest) -> dict[str, Any]:
+    _id_string: str | None = data.objectIDString
     if _id_string is None:
-        return jsonify({
+        return JSONResponse(
+            status_code=400,
+            content={
                 "sender": str(Sender.ERROR),
                 "content": "Can not delete a game without a valid ObjectIdString!",
-            }), 400
+            }
+        )
 
     _id: ObjectId = ObjectId(_id_string)
     db.delete_game(_id)
-    return jsonify({
+    return {
             "sender": str(Sender.SYSTEM),
             "content": "Game successfully deleted.",
-        }), 200
+        }
 
 
-@app.route('/api/load_game', methods=['POST'])
-def load_game() -> ResponseReturnValue:
-    data: dict[str, Any] = request.get_json()
-    _id_string: str | None = data.get('objectIDString')
+@app.post('/api/load_game')
+def load_game(data: LoadGameRequest) -> dict[str, Any]:
+    _id_string: str | None = data.objectIDString
     if _id_string is None:
-        return jsonify({
+        return JSONResponse(
+            status_code=400,
+            content={
                 "sender": str(Sender.ERROR),
                 "content": "Can not load a game without a valid ObjectIdString!",
-            }), 400
+            }
+        )
 
     _id: ObjectId = ObjectId(_id_string)
     save_data, ok = db.get_game_data(_id)
     if not ok:
-        return jsonify({
+        return JSONResponse(
+            status_code=400,
+            content={
                 "sender": str(Sender.ERROR),
                 "content": f"Provided save ID {_id_string} is not valid."
-            }), 400
+            }
+        )
     assert(save_data is not None)
     for key in save_data.keys():
         setattr(state, key, save_data[key])
     
     portrait_bytes, backdrop_bytes = db.get_image_bytes(_id)
-    return jsonify({
+    return {
             "sender": str(Sender.SYSTEM),
             "content": "Game state successfully loaded.",
             "portraitSrc": Image.json_content_from_bytes(portrait_bytes),
             "worldBackdropSrc": Image.json_content_from_bytes(backdrop_bytes),
             "hitPoints": state.hit_points,
-        }), 200
+        }
 
-@app.route('/api/initialize', methods=['POST'])
-def initialize() -> ResponseReturnValue:
+@app.post('/api/initialize')
+def initialize(data: InitializeRequest) -> dict[str, Any]:
     # NOTE: Temporary while in development.
     # NOTE: This cannot be used for multiple users.
     global state
     state = State()
 
-    data: dict[str, Any] = request.get_json()
-    required_fields: list[str] = ["playerName", "playerDescription", "worldTheme"]
-    
-    for field in required_fields:
-        assert(field in data)
-
-    camel_case: Callable[[str], str] = lambda s: re.sub(r'(?<!^)(?=[A-Z])', '_', s).lower()
-    for field in required_fields:
-        setattr(state, camel_case(field), data[field])
+    make_snake_case: Callable[[str], str] = lambda s: re.sub(r'(?<!^)(?=[A-Z])', '_', s).lower()
+    setattr(state, make_snake_case("playerName"), data.playerName)
+    setattr(state, make_snake_case("playerDescription"), data.playerDescription)
+    setattr(state, make_snake_case("worldTheme"), data.worldTheme)
 
     setup_initialization_prompt()
     images: Images = asyncio.run(get_new_images_for(state))
 
     db.save_game_and_images(state, images)
-    return jsonify({
+    return {
         "sender": str(Sender.SYSTEM),
         "systemPrompt": state.initialization_prompt,
         "portraitSrc": images.portrait.json_content(),
         "worldBackdropSrc": images.backdrop.json_content(),
         "hitPoints": MAX_HIT_POINTS,
-    }), 200
+    }
 
-@app.route('/api/response', methods=['POST'])
-def response() -> ResponseReturnValue:
+async def validate_and_get_gamemaster_reply(user_message: str) -> str | JSONResponse:
+    """Validate user message and get gamemaster reply.
+    
+    Starts all three tasks (relevant, realistic, gamemaster) simultaneously.
+    Validates relevant and realistic first. If either fails, cancels the gamemaster
+    task and returns an error JSONResponse. If both pass, returns the gamemaster reply.
+    """
+    relevant_task = asyncio.create_task(async_is_relevant(user_message))
+    realistic_task = asyncio.create_task(async_is_realistic(user_message))
+    
+    relevant, realistic = await asyncio.gather(
+        relevant_task,
+        realistic_task
+    )
+    
+    if not relevant or not realistic:
+        
+        content: str = ""
+        if not relevant and not realistic:
+            content = "Your message is not relevant or realistic."
+        elif not relevant:
+            content = "Your message is not relevant to the game story."
+        else:
+            content = "Your message does not respect the realism of the game story."
+
+        return JSONResponse(
+            status_code=400,
+            content={
+                "sender": str(Sender.ERROR),
+                "content": content,
+            }
+        )
+    
+    return await async_get_gamemaster_reply(user_message)
+
+@app.post('/api/response')
+async def response(data: ResponseRequest) -> dict[str, Any]:
     if state.game_over:
-        return jsonify({
+        return {
                 "sender": str(Sender.SYSTEM),
                 "content": "You are dead. Please refresh the browser to play again.",
-            }), 200
+            }
 
-    data: dict[str, Any] = request.get_json()
-    assert("content" in data.keys()) 
-
-    user_message = data["content"]
-    no_override: bool = True
+    user_message = data.content
+    override: bool = False
     if user_message.startswith("@override"):
-        no_override = False
+        override = True
         user_message: str = user_message.removeprefix("@override")
 
-    if no_override:
-        relevant = is_relevant(user_message)
-        realistic = is_realistic(user_message)
-        if not relevant or not realistic:
-            content: str = ""
-            if not relevant and not realistic:
-                content = "Your message is not relevant or realistic."
-            elif not relevant:
-                content = "Your message is not relevant to the game story."
-            else:
-                content = "Your message does not respect the realism of the game story."
+    if override:
+        reply: str = await async_get_gamemaster_reply(user_message)
+    else:
+        result = await validate_and_get_gamemaster_reply(user_message)
+        if isinstance(result, JSONResponse):
+            return result
+        reply: str = result
 
-            return jsonify({
-                    "sender": str(Sender.ERROR),
-                    "content": content,
-                })
-
-    reply: str = get_gamemaster_reply(user_message)
     if len(reply) == 0:
-        return jsonify({
+        return JSONResponse(
+            status_code=500,
+            content={
                 "sender": str(Sender.ERROR),
                 "content": "Gamemaster failed to generate a response.",
-            }), 500
+            }
+        )
 
     dmg: int = assess_damage(user_message, reply)
     state.hit_points -= dmg
@@ -309,20 +370,21 @@ def response() -> ResponseReturnValue:
         game_over()
         update_chat_history(user_message, None)
         db.save_game(state)
-        return jsonify({
+        return {
                 "sender": str(Sender.SYSTEM),
                 "content": "Oh, no! Unfortunately, you have died!",
                 "gameOverSummary": state.game_over_summary,
                 "hitPoints": state.hit_points,
-            }), 200
+            }
     else:
         update_chat_history(user_message, reply)
         db.save_game(state)
-        return jsonify({
+        return {
                 "sender": str(Sender.GAMEMASTER),
                 "content": reply,
                 "hitPoints": state.hit_points,
-            }), 200
+            }
 
 if __name__ == '__main__':
-    app.run(debug=True, port=3000)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=3000)
