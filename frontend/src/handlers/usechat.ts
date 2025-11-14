@@ -5,7 +5,7 @@ import type { Message, MessageResponse } from "../misc/types";
 import { API_RESPONSE_URL } from "../misc/enums";
 import postJsonRequest from "../misc/postjsonrequest";
 
-const useChat = () => {
+const useChat = (gameId: string | null) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
 
@@ -19,6 +19,10 @@ const useChat = () => {
 
   const sendMessage = async (): Promise<MessageResponse | null> => {
     if (!input.trim()) return null;
+    if (!gameId) {
+      console.error("Cannot send message: gameId is not set");
+      return null;
+    }
 
     const userMessage = input;
     addMessage({ sender: 'user', content: userMessage });
@@ -26,6 +30,7 @@ const useChat = () => {
 
     const result = await postJsonRequest(API_RESPONSE_URL, {
       content: userMessage,
+      gameId: gameId,
     });
 
 	console.log(result);

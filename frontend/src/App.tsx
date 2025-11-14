@@ -21,8 +21,9 @@ function ChatApp() {
   const [portraitSrc, setPortraitSrc] = useState<string>("");
   const [worldBackdropSrc, setWorldBackdropSrc] = useState<string>("");
   const [hitPoints, setHitPoints] = useState<number>(-1);
+  const [gameId, setGameId] = useState<string | null>(null);
 
-  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter, clearMessages } = useChat();
+  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter, clearMessages } = useChat(gameId);
   
 
   const emptyGameInfo = {
@@ -58,6 +59,11 @@ function ChatApp() {
       data = result.data;
       addMessage({ "sender": data.sender, "content": data.content })
       
+      // Store the game ID
+      if (data.gameId) {
+        setGameId(data.gameId);
+      }
+      
       // Render all prior chats.
       selectedSave.chatHistory.forEach((m: ChatHistoryMessage, idx: number) => {
         if (idx === 0) return;
@@ -75,6 +81,10 @@ function ChatApp() {
       data = result.data;
 
       if (result.ok) {
+        // Store the game ID
+        if (data.gameId) {
+          setGameId(data.gameId);
+        }
 
         addMessage({
           sender: 'system',
@@ -127,7 +137,8 @@ function ChatApp() {
     clearMessages();
     setPortraitSrc("");
     setWorldBackdropSrc("");
-    setFormSubmitted(false); 
+    setFormSubmitted(false);
+    setGameId(null);
     setShowModal(true);
   }
 
