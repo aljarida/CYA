@@ -1,58 +1,44 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import type { MessageProps } from "../misc/types";
-import { API_GET_SUGGESTED_RESPONSES_URL } from '../misc/enums';
-import getJsonRequest from '../misc/getjsonrequest';
+import { getSuggestedResponses } from '../api/suggestions';
 
-function Message({ message, index, gameId, onSuggestionClick }: MessageProps) {
+function uniqueSuggestions(values: string[]) {
+    const seen = new Set<string>();
+    return values
+        .map((value) => value.trim())
+        .filter((value) => {
+            if (!value || seen.has(value)) return false;
+            seen.add(value);
+            return true;
+        });
+}
+
+function Message({ message, gameId, onSuggestionClick, closeSignal }: MessageProps) {
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const messageRef = useRef<HTMLDivElement>(null);
-    const suggestionsRef = useRef<HTMLDivElement>(null);
 
-    // Handle click-away to hide suggestions
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                showSuggestions &&
-                messageRef.current &&
-                suggestionsRef.current &&
-                !messageRef.current.contains(event.target as Node) &&
-                !suggestionsRef.current.contains(event.target as Node)
-            ) {
-                setShowSuggestions(false);
-            }
-        };
-
-        if (showSuggestions) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [showSuggestions]);
+        setShowSuggestions(false);
+    }, [closeSignal]);
 
     const handleGetSuggestions = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        
+
         if (!gameId || isLoadingSuggestions) return;
+        if (showSuggestions) {
+            setShowSuggestions(false);
+            return;
+        }
+
+        setShowSuggestions(true);
+        if (suggestions.length > 0) return;
 
         setIsLoadingSuggestions(true);
-        setShowSuggestions(true);
 
         try {
-            const result = await getJsonRequest(API_GET_SUGGESTED_RESPONSES_URL, {
-                gameId: gameId,
-                n: 3
-            });
-
-            if (result.ok && result.data.suggestions) {
-                setSuggestions(result.data.suggestions);
-            } else {
-                setSuggestions([]);
-            }
+            setSuggestions(uniqueSuggestions(await getSuggestedResponses(gameId, 3)));
         } catch (error) {
             console.error('Failed to fetch suggestions:', error);
             setSuggestions([]);
@@ -71,8 +57,7 @@ function Message({ message, index, gameId, onSuggestionClick }: MessageProps) {
     return (
         <div className={`relative flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
             <div 
-                ref={messageRef}
-                className={`p-4 rounded-lg w-fit max-w-lg relative ${
+                className={`p-4 rounded-lg w-fit max-w-full sm:max-w-lg relative ${
                     message.sender === 'user' 
                         ? 'bg-neutral-800/70 text-neutral-300' 
                         : message.sender == 'system'
@@ -83,44 +68,49 @@ function Message({ message, index, gameId, onSuggestionClick }: MessageProps) {
                 } backdrop-blur-sm shadow-lg`}
             >              
                 <p className="text-sm break-words whitespace-pre-line">{message.content}</p>
-                
-                {isGamemasterMessage && (
-                    <button
-                        onClick={handleGetSuggestions}
-                        className="absolute bottom-2 right-2 p-1.5 rounded-full bg-neutral-600/50 hover:bg-neutral-600/80 transition-colors duration-200 backdrop-blur-sm"
-                        title="Get suggested responses"
-                    >
-                        <Sparkles size={14} className="text-neutral-300" />
-                    </button>
-                )}
 
-                {showSuggestions && isGamemasterMessage && (
-                    <div 
-                        ref={suggestionsRef}
-                        className="absolute left-full ml-4 -top-8 flex flex-col gap-2 z-50 min-w-[200px] max-w-[300px]"
-                    >
-                    {isLoadingSuggestions ? (
-                        <div className="bg-neutral-800/90 text-neutral-300 p-3 rounded-lg shadow-lg backdrop-blur-sm">
-                            <p className="text-xs">Loading suggestions...</p>
-                        </div>
-                    ) : suggestions.length > 0 ? (
-                        suggestions.map((suggestion, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => handleSuggestionClick(suggestion)}
-                                className="bg-neutral-800/90 hover:bg-neutral-700/90 text-neutral-200 p-3 rounded-lg shadow-lg backdrop-blur-sm text-left text-sm transition-colors duration-200 border border-neutral-700/50 hover:border-neutral-600/50"
-                            >
-                                {suggestion}
-                            </button>
-                        ))
-                    ) : (
-                        <div className="bg-neutral-800/90 text-neutral-400 p-3 rounded-lg shadow-lg backdrop-blur-sm">
-                            <p className="text-xs">No suggestions available</p>
-                        </div>
-                    )}
+                {isGamemasterMessage && (
+                    <div className="mt-3 flex justify-end">
+                        <button
+                            onClick={handleGetSuggestions}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-neutral-600/40 px-2.5 py-1.5 text-xs text-neutral-200 transition-colors duration-200 hover:bg-neutral-600/70"
+                            title={showSuggestions ? "Close response suggestions" : "Open response suggestions"}
+                            aria-expanded={showSuggestions}
+                        >
+                            <Sparkles size={14} className="shrink-0 text-neutral-300" />
+                            <span>Suggestions</span>
+                        </button>
                     </div>
                 )}
             </div>
+
+            {showSuggestions && isGamemasterMessage && (
+                <div className="mt-2 grid w-full max-w-full gap-2 overflow-hidden transition-all duration-200 sm:max-w-lg">
+                    {isLoadingSuggestions ? (
+                        <div className="rounded-lg border border-neutral-700/50 bg-neutral-800/90 p-3 text-neutral-300 shadow-lg backdrop-blur-sm">
+                            <p className="text-xs">Generating suggestions...</p>
+                        </div>
+                    ) : suggestions.length > 0 ? (
+                        suggestions.map((suggestion) => (
+                            <button
+                                key={suggestion}
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="rounded-lg border border-neutral-700/50 bg-neutral-800/90 p-3 text-left text-sm text-neutral-200 shadow-lg backdrop-blur-sm transition-colors duration-200 hover:border-neutral-600/50 hover:bg-neutral-700/90"
+                            >
+                                <span className="mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-indigo-200/80">
+                                    <Sparkles size={12} />
+                                    Suggested reply
+                                </span>
+                                <span className="block break-words">{suggestion}</span>
+                            </button>
+                        ))
+                    ) : (
+                        <div className="rounded-lg border border-neutral-700/50 bg-neutral-800/90 p-3 text-neutral-400 shadow-lg backdrop-blur-sm">
+                            <p className="text-xs">No suggestions available</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

@@ -2,10 +2,9 @@ import { useState } from "react";
 
 import type { Message, MessageResponse } from "../misc/types";
 
-import { API_RESPONSE_URL } from "../misc/enums";
-import postJsonRequest from "../misc/postjsonrequest";
+import { sendChatMessage } from "../api/chat";
 
-const useChat = (gameId: string | null) => {
+const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
 
@@ -17,7 +16,10 @@ const useChat = (gameId: string | null) => {
     setMessages([]);
   }
 
-  const sendMessage = async (messageOverride?: string): Promise<MessageResponse | null> => {
+  const sendMessage = async (
+    messageOverride?: string,
+    gameId?: string | null,
+  ): Promise<MessageResponse | null> => {
     const userMessage = messageOverride || input;
     if (!userMessage.trim()) return null;
     if (!gameId) {
@@ -30,12 +32,7 @@ const useChat = (gameId: string | null) => {
       setInput("");
     }
 
-    const result = await postJsonRequest(API_RESPONSE_URL, {
-      content: userMessage,
-      gameId: gameId,
-    });
-
-	console.log(result);
+    const result = await sendChatMessage(userMessage, gameId);
     const data: MessageResponse = result.data
 
     if (result.ok) {

@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 openai
+httpx
 python-dotenv
 pymongo
 requests
-

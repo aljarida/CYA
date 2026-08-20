@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { SetupFormProps, GameSave } from '../misc/types'
 import FormField from './FormField'
 import pretty_timestamp from '../misc/pretty_timestamp.ts'
+import { gameInfoValidationMessage } from '../features/setup/setupValidation'
 
 
 function SetupForm({
@@ -24,6 +25,8 @@ function SetupForm({
       setTimeout(() => setClickedDelete(false), 2000);
     }
   }
+
+  const validationMessage = gameInfoValidationMessage(gameInfo, existingGames);
 
   return (
     <>
@@ -105,6 +108,7 @@ function SetupForm({
           <button
             onClick={() => onSubmit(null)}
             disabled={!isFormValid}
+            aria-describedby={validationMessage ? 'setup-validation-message' : undefined}
             className={`w-full py-3 rounded-lg shadow-lg mt-4 transition-colors backdrop-blur-sm ${
               isFormValid
                 ? 'bg-green-700/70 hover:bg-green-600/70 text-neutral-200 border border-neutral-600/50'
@@ -113,6 +117,15 @@ function SetupForm({
           >
             Begin Adventure
           </button>
+          {validationMessage ? (
+            <p
+              id="setup-validation-message"
+              role="status"
+              className="mt-3 text-sm text-neutral-400"
+            >
+              {validationMessage}
+            </p>
+          ) : null}
         </div>
       )}
     </>

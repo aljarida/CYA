@@ -1,7 +1,9 @@
 # Backend
 /backend/target/*
+/backend/data/
 Cargo.lock
 **/__pycache__/
+/.venv/
 
 # Frontend
 /node_modules/*
@@ -22,4 +24,3 @@ pnpm-debug.log*
 /**/*.swp
 /**/*.swo
 /**/*.sw
-

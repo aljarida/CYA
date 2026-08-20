@@ -3,11 +3,60 @@ import type {
     KeyboardEvent,
 } from 'react';
 
+import type { DraftStartingState } from '../features/setup/setupTypes';
+
+export type InventoryItem = {
+  id: string;
+  name: string;
+  description: string;
+  weightKg: number;
+  quantity: number;
+};
+
+export type PlayerAttributes = {
+  ageYears: number | null;
+  heightCm: number | null;
+  bodyWeightKg: number | null;
+  maxCarryWeightKg: number;
+};
+
+export type Quest = {
+  id: string;
+  title: string;
+  description: string;
+  status: 'active' | 'resolved';
+  currentStep: string;
+  stepHistory: string[];
+  outcome: string;
+};
+
+export type StoryMoment = {
+  id: string;
+  caption: string;
+  imageSrc: string;
+};
+
+export type WorldState = {
+  currentLocation: string;
+  inventory: InventoryItem[];
+  totalInventoryWeightKg: number;
+  conditions: string[];
+  knownNpcs: Record<string, string>;
+  relationships: Record<string, string>;
+  quests: Quest[];
+  worldFlags: Record<string, unknown>;
+};
+
 export type MessageResponse = {
   sender: 'user' | 'system' | 'error' | 'gamemaster';
   content: string;
   hitPoints?: number;
   gameOverSummary?: string;
+  worldState?: WorldState;
+  playerAttributes?: PlayerAttributes;
+  storySummary?: string;
+  unresolvedThreads?: string[];
+  moment?: StoryMoment;
 }
 
 export type GameInfo = {
@@ -48,6 +97,12 @@ export type SetupModalProps = {
   handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onSubmit: (save: GameSave | null) => Promise<void>;
   setIsFormValid: (val: boolean) => void;
+  setupStep: 'form' | 'summary';
+  draftState: DraftStartingState | null;
+  onDraftChange: (next: DraftStartingState) => void;
+  onRegenerateDraft: () => void;
+  isRegeneratingDraft: boolean;
+  onConfirmDraft: () => void;
 };
 
 export type MessageProps = {
@@ -55,6 +110,7 @@ export type MessageProps = {
   index: number;
   gameId: string | null;
   onSuggestionClick: (suggestion: string) => void;
+  closeSignal?: number;
 };
 
 export type Message = {
@@ -94,7 +150,7 @@ export type GameSave = {
   createdAt: string
   updatedAt: string
   objectIDString: string
-  chatHistory: any[]
+  chatHistory: ChatHistoryMessage[]
 }
 
 export type BackButtonProps = {

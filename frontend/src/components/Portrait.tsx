@@ -29,7 +29,7 @@ function Portrait({ src }: { src: string }) {
     <>
       <div
         onClick={() => setIsModalOpen(true)}
-        className="cursor-pointer absolute top-4 right-8 border-4 w-20 h-20 z-10 rounded-xl backdrop-blur-sm shadow-xl border border-white/20 hover:outline-none hover:ring-2 hover:ring-neutral-500"
+        className="cursor-pointer absolute top-4 right-4 sm:right-8 border-4 w-20 h-20 z-10 rounded-xl backdrop-blur-sm shadow-xl border border-white/20 hover:outline-none hover:ring-2 hover:ring-neutral-500"
       >
         <img
           src={src}

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-
-import { API_INITIALIZE_URL, API_LOAD_GAME_URL, } from './misc/enums';
-import postJsonRequest from './misc/postjsonrequest';
+import type { ChangeEvent } from 'react';
+import { BookOpen } from 'lucide-react';
 
 import useChat from './handlers/usechat';
+import { useGameSession } from './features/game/useGameSession';
 
 import SetupModal from './components/SetupModal';
 import ChatMessages from './components/ChatMessages';
@@ -12,31 +12,47 @@ import Portrait from './components/Portrait';
 import HitPoints from './components/HitPoints';
 import WorldBackdrop from './components/WorldBackdrop';
 import BackButton from './components/BackButton';
+import MomentPopup from './components/MomentPopup';
+import WorldStatePanel from './features/game/WorldStatePanel';
 
-import type { ChatHistoryMessage, GameSave, LoadMessage } from './misc/types';
+import type { GameSave } from './misc/types';
 
 function ChatApp() {
-  const [showModal, setShowModal] = useState(true);
-  const [formSubmitted, setFormSubmitted] = useState(false);
-  const [portraitSrc, setPortraitSrc] = useState<string>("");
-  const [worldBackdropSrc, setWorldBackdropSrc] = useState<string>("");
-  const [hitPoints, setHitPoints] = useState<number>(-1);
-  const [gameId, setGameId] = useState<string | null>(null);
+  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter, clearMessages } = useChat();
+  const {
+    showModal,
+    formSubmitted,
+    setupStep,
+    draftState,
+    setDraftState,
+    isRegeneratingDraft,
+    portraitSrc,
+    worldBackdropSrc,
+    hitPoints,
+    gameId,
+    gameInfo,
+    setGameInfo,
+    isFormValid,
+    setIsFormValid,
+    worldState,
+    playerAttributes,
+    storySummary,
+    unresolvedThreads,
+    moments,
+    activeMoment,
+    dismissMoment,
+    startOrLoadGame,
+    generateDraft,
+    regenerateDraft,
+    confirmAndStart,
+    applyResponseEffects,
+    discardItem,
+    unloadGame,
+  } = useGameSession({ addMessage, clearMessages });
 
-  const { messages, input, setInput, sendMessage, addMessage, getInputPriorTo, getInputAfter, clearMessages } = useChat(gameId);
-  
+  const [journalOpen, setJournalOpen] = useState(false);
 
-  const emptyGameInfo = {
-    playerName: "",
-    worldTheme: "",
-    playerDescription: "",
-  }
-
-  const [gameInfo, setGameInfo] = useState(emptyGameInfo);
-
-  const [isFormValid, setIsFormValid] = useState(false);
-
-  const handleInputChange = (e: any) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setGameInfo(prev => ({
       ...prev,
@@ -45,78 +61,20 @@ function ChatApp() {
   };
 
   const handleFormSubmit = async (selectedSave: GameSave | null) => {
-    if (!selectedSave && !isFormValid) return;
-
-    let data;
-    setFormSubmitted(true);
-    if (selectedSave !== null) {
-      // Load the game save on the backend.
-      const loadMessage: LoadMessage = {
-        objectIDString: selectedSave.objectIDString
-      };
-      const result = await postJsonRequest(API_LOAD_GAME_URL, loadMessage);
-      console.assert(result.ok, `Fatal error loading game: ${result.data}`)
-      data = result.data;
-      addMessage({ "sender": data.sender, "content": data.content })
-      
-      // Store the game ID
-      if (data.gameId) {
-        setGameId(data.gameId);
-      }
-      
-      // Render all prior chats.
-      selectedSave.chatHistory.forEach((m: ChatHistoryMessage, idx: number) => {
-        if (idx === 0) return;
-        addMessage({ sender: m.role, content: m.content });
-      });
-
-      if (selectedSave.gameOverSummary) {
-        addMessage({ "sender": "system", "content": "Oh, no! Unfortunately, you have died!"})
-        addMessage({ "sender": "system", "content": selectedSave.gameOverSummary })
-      }
-
+    if (selectedSave) {
+      await startOrLoadGame(selectedSave);
     } else {
-      // Handle initializing a new game.
-      const result = await postJsonRequest(API_INITIALIZE_URL, gameInfo);
-      data = result.data;
-
-      if (result.ok) {
-        // Store the game ID
-        if (data.gameId) {
-          setGameId(data.gameId);
-        }
-
-        addMessage({
-          sender: 'system',
-          content: `Welcome to your adventure, ${gameInfo.playerName}! Simply start typing to get started!`,
-        });
-      } else {
-        addMessage({
-          sender: 'error',
-          content: data.content,
-        });
-      }
-      
+      await generateDraft(gameInfo);
     }
-
-    setHitPoints(data.hitPoints);
-    setPortraitSrc(data.portraitSrc);
-    setWorldBackdropSrc(data.worldBackdropSrc)
-    setShowModal(false);
-    setGameInfo(emptyGameInfo)
   };
 
-  const handleSendMessage = async () => {
-    const data = await sendMessage();
-    if (data && data.hasOwnProperty('hitPoints') && typeof data.hitPoints == 'number') {
-      const lostHitpoints: number = hitPoints - data.hitPoints;
-      if (lostHitpoints) {
-        setHitPoints(data.hitPoints);
-        if (data.hitPoints > 0) {
-          addMessage({ "sender": "system", "content": `You lost ${lostHitpoints} health!` })
-        }
-      }
-    }
+  const handleSendMessage = async (messageOverride?: string) => {
+    const data = await sendMessage(messageOverride, gameId);
+    applyResponseEffects(data);
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInput(suggestion);
   }
 
   const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -133,17 +91,8 @@ function ChatApp() {
     }
   }
 
-  const unloadGame = () => {
-    clearMessages();
-    setPortraitSrc("");
-    setWorldBackdropSrc("");
-    setFormSubmitted(false);
-    setGameId(null);
-    setShowModal(true);
-  }
-
   return (
-    <div className="relative flex flex-col h-screen bg-gradient-to-br from-neutral-800 via-gray-700 to-neutral-600 p-8 pr-16">
+    <div className="relative flex h-screen min-w-0 flex-col overflow-x-hidden bg-gradient-to-br from-neutral-800 via-gray-700 to-neutral-600 px-4 py-6 sm:p-8">
       <SetupModal
         showModal={showModal}
         formSubmitted={formSubmitted}
@@ -152,24 +101,42 @@ function ChatApp() {
         handleInputChange={handleInputChange}
         onSubmit={handleFormSubmit}
         setIsFormValid={setIsFormValid}
+        setupStep={setupStep}
+        draftState={draftState}
+        onDraftChange={setDraftState}
+        onRegenerateDraft={regenerateDraft}
+        isRegeneratingDraft={isRegeneratingDraft}
+        onConfirmDraft={confirmAndStart}
       />
 
       <WorldBackdrop src={worldBackdropSrc} />
       <Portrait src={portraitSrc} />
       <HitPoints hitPoints={hitPoints} />
 
-      <ChatMessages messages={messages} gameId={gameId} onSuggestionClick={async (suggestion: string) => {
-        const data = await sendMessage(suggestion);
-        if (data && data.hasOwnProperty('hitPoints') && typeof data.hitPoints == 'number') {
-          const lostHitpoints: number = hitPoints - data.hitPoints;
-          if (lostHitpoints) {
-            setHitPoints(data.hitPoints);
-            if (data.hitPoints > 0) {
-              addMessage({ "sender": "system", "content": `You lost ${lostHitpoints} health!` })
-            }
-          }
-        }
-      }} />
+      {!showModal && (
+        <button
+          onClick={() => setJournalOpen(o => !o)}
+          className="absolute top-5 left-14 z-10 p-2 rounded-full bg-black/20 hover:bg-black/40 transition-colors duration-200 backdrop-blur-sm"
+          title="Journal"
+        >
+          <BookOpen size={16} className="text-white/70 hover:text-white" />
+        </button>
+      )}
+
+      <WorldStatePanel
+        worldState={worldState}
+        playerAttributes={playerAttributes}
+        isOpen={journalOpen}
+        onClose={() => setJournalOpen(false)}
+        onDiscard={discardItem}
+        moments={moments}
+        storySummary={storySummary}
+        unresolvedThreads={unresolvedThreads}
+      />
+
+      <MomentPopup moment={activeMoment} onDismiss={dismissMoment} />
+
+      <ChatMessages messages={messages} gameId={gameId} onSuggestionClick={handleSuggestionClick} />
       <ChatInput
         input={input}
         setInput={setInput}
